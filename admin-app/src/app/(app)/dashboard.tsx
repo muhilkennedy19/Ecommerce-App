@@ -78,11 +78,12 @@ export default function Dashboard() {
     );
   }
 
-  const perishableStale = products.filter(
-    (p) => p.perishable && isStaleToday(tsToDate(p.priceUpdatedAt)),
-  );
-  const stockStale = products.filter(
-    (p) => p.trackStock && isStaleToday(tsToDate(p.stockUpdatedAt)),
+  // Badge count for the inventory tile: perishables needing a re-price plus
+  // stock-tracked items not counted today.
+  const inventoryStale = products.filter(
+    (p) =>
+      (p.perishable && isStaleToday(tsToDate(p.priceUpdatedAt))) ||
+      (p.trackStock && isStaleToday(tsToDate(p.stockUpdatedAt))),
   );
 
   const visible = SECTIONS.filter((s) => userHasPermission(appUser, s.perm));
@@ -104,37 +105,26 @@ export default function Dashboard() {
         </View>
       </Card>
 
-      {canSeeReminders && stockStale.length > 0 ? (
-        <>
-          <SectionTitle>{t('dash.reminders', 'Daily reminders')}</SectionTitle>
-          <ReminderCard
-            title={t('dash.updateStock', 'Update stock ({count})', { count: stockStale.length })}
-            hint={t('dash.updateStockHint', 'Stock-tracked items not updated today.')}
-            names={stockStale.map((p) => p.name)}
-          />
-        </>
-      ) : null}
-
       <SectionTitle>{t('dash.manage', 'Manage')}</SectionTitle>
       {visible.length === 0 ? (
         <EmptyState title={t('dash.nothingTitle', 'Nothing to show')} hint={t('dash.nothingHint', 'Your role has no sections enabled.')} />
       ) : (
         <View style={styles.grid}>
           {canSeeReminders ? (
-            <Link href={'/price-updates' as never} asChild>
+            <Link href={'/inventory' as never} asChild>
               <Pressable style={{ flexBasis: '47%', flexGrow: 1 }}>
                 <Card style={{ gap: Spacing.one, minHeight: 96 }}>
                   <View style={styles.tileTop}>
                     <ThemedText type="title" style={{ fontSize: 28, lineHeight: 34 }}>
-                      💰
+                      📋
                     </ThemedText>
-                    {perishableStale.length > 0 ? (
-                      <Badge label={String(perishableStale.length)} color="#F2A900" />
+                    {inventoryStale.length > 0 ? (
+                      <Badge label={String(inventoryStale.length)} color="#F2A900" />
                     ) : null}
                   </View>
-                  <ThemedText type="smallBold">{t('dash.priceUpdates', 'Update prices')}</ThemedText>
+                  <ThemedText type="smallBold">{t('dash.inventory', 'Update inventory')}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {t('dash.priceUpdates.sub', 'Perishables to re-price')}
+                    {t('dash.inventory.sub', 'Daily price & stock')}
                   </ThemedText>
                 </Card>
               </Pressable>
@@ -206,18 +196,6 @@ export default function Dashboard() {
         }
       />
     </Screen>
-  );
-}
-
-function ReminderCard({ title, hint, names }: Readonly<{ title: string; hint: string; names: string[] }>) {
-  return (
-    <Card>
-      <ThemedText type="smallBold">{title}</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
-        {hint}
-      </ThemedText>
-      <ThemedText type="small">{names.slice(0, 6).join(', ')}{names.length > 6 ? '…' : ''}</ThemedText>
-    </Card>
   );
 }
 
