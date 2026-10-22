@@ -41,7 +41,9 @@
       [
         "expo-notifications",
         {
-          "sounds": ["./assets/sounds/order_ring.wav"]
+          "sounds": [
+            "./assets/sounds/order_ring.wav"
+          ]
         }
       ]
     ],
@@ -59,7 +61,16 @@
         "appId": "1:376909191923:android:f5f48bbb0f457ba4d5f586"
       },
       "googleWebClientId": "376909191923-ijjq7hsvjsql3imgfc8h70sucg3cefju.apps.googleusercontent.com",
-      "shopId": "main"
-    }
+      "shopId": "main",
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "77dc3e89-717f-45df-ad4e-818b13d7c57a"
+      }
+    },
+    "owner": "mkencom"
   }
 }
