@@ -24,6 +24,7 @@ buyer-app/ios/
 *.p12
 *.key
 **/service-account*.json
+credentials.json
 .env
 .env*.local
 .dev.vars

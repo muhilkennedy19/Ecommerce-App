@@ -169,8 +169,31 @@ eas credentials -p android     # → production → the summary already prints S
 ```
 
 The summary screen shows the SHA-1 immediately; just copy it and choose **Go back**.
-From the same menu, use **Keystore → Download** to take a backup — **if the keystore
-is lost the app can never be updated on Play again.**
+
+### Backing up the keystore
+
+EAS **generated** this keystore server-side during the first production build — it was
+not created locally with `keytool`, and there is no local copy. Download it with:
+
+```
+eas credentials -p android
+  → production
+  → Keystore: Manage everything needed to build your project
+  → Download existing keystore
+```
+
+This writes a `.jks` into the current directory and prints the **key alias, keystore
+password and key password** to the terminal. The `.jks` is worthless without those
+three values — store them together in a password manager, not in the repo
+(`*.jks` and `credentials.json` are gitignored, but do not rely on that).
+
+> How bad is losing it? Less bad than it sounds, because Play App Signing is
+> mandatory for new apps: Google holds and backs up the real **app signing key**, and
+> your keystore is only the **upload key**. A lost upload key can be reset by
+> requesting it through Play Console support. Backing it up avoids that support
+> round-trip and keeps you able to build in the meantime — it is prudent, not
+> existential.
+
 
 ### Why this matters
 
