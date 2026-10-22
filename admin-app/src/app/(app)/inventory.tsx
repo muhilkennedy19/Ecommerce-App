@@ -1,4 +1,5 @@
 import {
+  fuzzyFilter,
   isStaleToday,
   subscribeProducts,
   touchProductPrice,
@@ -35,13 +36,16 @@ export default function Inventory() {
   const { appUser } = useAuth();
   const t = useT();
   const [products, setProducts] = useState<Product[]>([]);
+  const [search, setSearch] = useState('');
 
+  // Viewing follows the Products tile; saving still needs write access.
+  const canRead = userHasPermission(appUser, 'products.read');
   const canWrite = userHasPermission(appUser, 'products.write');
 
   useEffect(() => {
-    if (!canWrite) return;
+    if (!canRead) return;
     return subscribeProducts(shopId, setProducts);
-  }, [canWrite]);
+  }, [canRead]);
 
   // Saving stamps `priceUpdatedAt` / `stockUpdatedAt`, so a row drops off this
   // list by itself once the live feed syncs.
@@ -50,13 +54,21 @@ export default function Inventory() {
     [products],
   );
 
-  if (!canWrite) {
+  // Searching escapes the "due today" filter entirely — that is the point, so a
+  // stock count can be corrected for any item, not just the ones being nagged.
+  const searching = search.trim().length > 0;
+  const results = useMemo(
+    () => (searching ? fuzzyFilter(products, search, (p) => [p.name, p.description ?? '']) : stale),
+    [searching, products, search, stale],
+  );
+
+  if (!canRead) {
     return (
       <Screen>
         <Stack.Screen options={{ title: t('inventory.title', 'Update inventory') }} />
         <EmptyState
           title={t('common.noAccess', 'No access')}
-          hint={t('inventory.noAccessHint', "Your role can't update inventory.")}
+          hint={t('inventory.noAccessHint', "Your role can't view inventory.")}
         />
       </Screen>
     );
@@ -66,21 +78,47 @@ export default function Inventory() {
     <Screen>
       <Stack.Screen options={{ title: t('inventory.title', 'Update inventory') }} />
 
-      {stale.length === 0 ? (
+      <TextField
+        placeholder={t('inventory.search', 'Search products to update stock')}
+        value={search}
+        onChangeText={setSearch}
+        clearButtonMode="while-editing"
+        returnKeyType="search"
+      />
+
+      {!canWrite ? (
+        <Card>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('inventory.readOnly', "Your role can view inventory but can't change it.")}
+          </ThemedText>
+        </Card>
+      ) : null}
+
+      {results.length === 0 ? (
         <EmptyState
-          title={t('inventory.allDone', 'Inventory up to date')}
-          hint={t('inventory.allDoneHint', 'Nothing needs a price or stock update today.')}
+          title={
+            searching
+              ? t('inventory.noMatch', 'No products match')
+              : t('inventory.allDone', 'Inventory up to date')
+          }
+          hint={
+            searching
+              ? t('inventory.noMatchHint', 'Try a different name.')
+              : t('inventory.allDoneHint', 'Nothing needs a price or stock update today.')
+          }
         />
       ) : (
         <>
           <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <ThemedText type="small" themeColor="textSecondary" style={{ flex: 1 }}>
-              {t('inventory.intro', "Items whose price or stock hasn't been updated today.")}
+              {searching
+                ? t('inventory.searchIntro', 'Matching products — edit price or stock any time.')
+                : t('inventory.intro', "Items whose price or stock hasn't been updated today.")}
             </ThemedText>
-            <Badge label={String(stale.length)} color="#F2A900" />
+            <Badge label={String(results.length)} color={searching ? '#4A90D9' : '#F2A900'} />
           </Card>
-          {stale.map((p) => (
-            <InventoryRow key={p.id} product={p} />
+          {results.map((p) => (
+            <InventoryRow key={p.id} product={p} canWrite={canWrite} />
           ))}
         </>
       )}
@@ -88,7 +126,10 @@ export default function Inventory() {
   );
 }
 
-function InventoryRow({ product }: Readonly<{ product: Product }>) {
+function InventoryRow({
+  product,
+  canWrite,
+}: Readonly<{ product: Product; canWrite: boolean }>) {
   const t = useT();
   const toast = useToast();
   const [price, setPrice] = useState(String(product.price));
@@ -222,7 +263,12 @@ function InventoryRow({ product }: Readonly<{ product: Product }>) {
       ) : null}
 
       <View style={{ alignSelf: 'flex-start' }}>
-        <Button title={t('inventory.save', 'Save')} onPress={() => void onSave()} loading={saving} />
+        <Button
+          title={t('inventory.save', 'Save')}
+          onPress={() => void onSave()}
+          loading={saving}
+          disabled={!canWrite}
+        />
       </View>
     </Card>
   );

@@ -51,12 +51,14 @@ export default function Dashboard() {
   const confirm = useConfirm();
   const [products, setProducts] = useState<Product[]>([]);
 
-  const canSeeReminders = userHasPermission(appUser, 'products.write');
+  // Same visibility as the Products tile; the screen itself gates editing on
+  // products.write.
+  const canSeeInventory = userHasPermission(appUser, 'products.read');
 
   useEffect(() => {
-    if (!canSeeReminders) return;
+    if (!canSeeInventory) return;
     return subscribeProducts(shopId, setProducts);
-  }, [canSeeReminders]);
+  }, [canSeeInventory]);
 
   // No role yet → access pending.
   if (user && !appUser) {
@@ -110,7 +112,7 @@ export default function Dashboard() {
         <EmptyState title={t('dash.nothingTitle', 'Nothing to show')} hint={t('dash.nothingHint', 'Your role has no sections enabled.')} />
       ) : (
         <View style={styles.grid}>
-          {canSeeReminders ? (
+          {canSeeInventory ? (
             <Link href={'/inventory' as never} asChild>
               <Pressable style={{ flexBasis: '47%', flexGrow: 1 }}>
                 <Card style={{ gap: Spacing.one, minHeight: 96 }}>
