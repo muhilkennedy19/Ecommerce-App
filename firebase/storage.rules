@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// Storage access for product images and employee/customer documents.
+// Role is read from Firestore /users/{uid}.role.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function role() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function roleIn(roles) {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && (role() in roles);
+    }
+
+    // Product images: readable by any signed-in user; written by product managers.
+    match /products/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if roleIn(['product-manager', 'superuser']);
+    }
+
+    // Employee documents (photo, proof): managed by employee managers or the employee.
+    match /employees/{employeeId}/{allPaths=**} {
+      allow read: if roleIn(['employee-manager', 'superuser']);
+      allow write: if roleIn(['employee-manager', 'superuser']);
+    }
+
+    // Customer uploads: the owner (id == uid) or customer managers.
+    match /customers/{customerId}/{allPaths=**} {
+      allow read: if roleIn(['customer-manager', 'admin', 'superuser'])
+        || (isSignedIn() && request.auth.uid == customerId);
+      allow write: if roleIn(['customer-manager', 'superuser'])
+        || (isSignedIn() && request.auth.uid == customerId);
+    }
+  }
+}

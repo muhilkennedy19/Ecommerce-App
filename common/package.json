@@ -1,0 +1,8 @@
+{
+  "name": "@eco/common",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "description": "Shared types, Firebase client, roles, and OTP logic for the admin and buyer apps"
+}

@@ -1,0 +1,14 @@
+name = "notify"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+# Cron trigger for the re-reminder sweep (scheduled handler in src/index.ts).
+# Every minute — Cloudflare's free-plan minimum interval. Cron triggers are free.
+# Requires a re-deploy (`npx wrangler deploy`) to take effect.
+[triggers]
+crons = ["* * * * *"]
+
+# No vars/KV/bindings are required. The only configuration is a single secret,
+# set out-of-band with `wrangler secret put FIREBASE_SERVICE_ACCOUNT`.
+# The Firebase project_id is read from the service-account JSON, so there is
+# nothing else to configure here.

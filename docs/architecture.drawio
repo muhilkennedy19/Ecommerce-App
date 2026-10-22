@@ -1,0 +1,714 @@
+<mxfile host="app.diagrams.net" modified="2026-10-22T00:00:00.000Z" agent="GitHub Copilot" version="24.0.0" type="device">
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 1 — SYSTEM ARCHITECTURE                                          -->
+  <!-- ===================================================================== -->
+  <diagram id="page-system" name="1 · System Architecture">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="p1-title" value="Rajendran Fruit &amp; Flower — System Architecture&lt;br/&gt;&lt;font style=&quot;font-size:12px&quot;&gt;Expo/React Native monorepo · Firebase Spark (free) · Cloudflare Workers (free)&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1380" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Containers -->
+        <mxCell id="p1-c1" value="CLIENT LAYER — Android (React Native 0.88 · Expo SDK 58 · expo-router · React 19)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1;fontSize=13;align=left;spacingLeft=12;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="700" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-c2" value="@common — shared TypeScript workspace package (single source of truth)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1;fontSize=13;align=left;spacingLeft=12;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="580" width="700" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-c3" value="FIREBASE — project &quot;ecommerce-rajendran&quot; (Spark / free tier — no Cloud Functions, no Cloud Storage)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1;fontSize=13;align=left;spacingLeft=12;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="800" y="80" width="620" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-c4" value="CLOUDFLARE WORKERS — &quot;notify&quot; (replaces paid Cloud Functions)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1;fontSize=13;align=left;spacingLeft=12;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="800" y="580" width="620" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-c5" value="EXTERNAL / THIRD-PARTY SERVICES" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1;fontSize=13;align=left;spacingLeft=12;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="820" width="1380" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- Buyer app -->
+        <mxCell id="p1-buyer-h" value="buyer-app  ·  com.ecommerce.buyer  ·  &quot;Rajendran Fruit &amp; Flower&quot;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="60" y="120" width="330" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-buyer-routes" value="&lt;b&gt;src/app (expo-router)&lt;/b&gt;&lt;br/&gt;• index.tsx — boot redirect&lt;br/&gt;• sign-in.tsx — Google Sign-In&lt;br/&gt;• (shop)/_layout — CartProvider + guard&lt;br/&gt;• (shop)/(tabs)/home — catalog, search, featured&lt;br/&gt;• (shop)/(tabs)/orders — history + pagination&lt;br/&gt;• (shop)/(tabs)/profile — addresses, locale, watchlist&lt;br/&gt;• (shop)/checkout — address, pincode, coupon, COD/UPI&lt;br/&gt;• (shop)/product/[id] — detail + add to cart" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="60" y="160" width="330" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-buyer-lib" value="&lt;b&gt;src/lib&lt;/b&gt;  auth.tsx · cart.ts · config.ts · i18n.tsx · push.ts&lt;br/&gt;&lt;b&gt;hooks&lt;/b&gt;  use-cached-image · use-shop-name · use-theme · use-color-scheme&lt;br/&gt;&lt;b&gt;components&lt;/b&gt;  kit · feedback · themed-text · themed-view&lt;br/&gt;&lt;b&gt;i18n&lt;/b&gt;  en / ta / hi / kn" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="60" y="340" width="330" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-buyer-extra" value="app.json → expo.extra: firebase{...} · googleWebClientId · shopId=&quot;main&quot; · notifyUrl" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="60" y="440" width="330" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Admin app -->
+        <mxCell id="p1-admin-h" value="admin-app  ·  com.ecommerce.admin  ·  &quot;Rajendran Sellers&quot;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="400" y="120" width="320" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-admin-routes" value="&lt;b&gt;src/app (expo-router)&lt;/b&gt;&lt;br/&gt;• sign-in.tsx — Google + role gate&lt;br/&gt;• (app)/dashboard — overview&lt;br/&gt;• (app)/orders/ index + [id] — accept / edit / status&lt;br/&gt;• (app)/products/ index + edit — catalog, stock, images&lt;br/&gt;• (app)/employees/ index + [id] — invite, onboarding&lt;br/&gt;• (app)/customers/index · coupons · analytics&lt;br/&gt;• (app)/settings — hours, UPI VPA, discount, force-close&lt;br/&gt;• (app)/roles — grant/revoke, pending requests&lt;br/&gt;• (app)/notifications · purge" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="400" y="160" width="320" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-admin-lib" value="&lt;b&gt;src/lib&lt;/b&gt;  auth.tsx (role-aware) · config.ts · i18n.tsx · push.ts&lt;br/&gt;&lt;b&gt;extras&lt;/b&gt;  xlsx export · expo-print bills · expo-image-picker&lt;br/&gt;&lt;b&gt;channel&lt;/b&gt;  &quot;orders&quot; — importance MAX + order_ring.wav" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="400" y="340" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-admin-extra" value="app.json → expo.extra: firebase{...} · googleWebClientId · shopId · notifyUrl" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="400" y="440" width="320" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- common package -->
+        <mxCell id="p1-cm-types" value="types/&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Order, Product, Customer,&lt;br/&gt;Employee, Shop, Coupon…&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="620" width="155" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-cm-roles" value="roles/&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;7 roles · 14 permissions&lt;br/&gt;hasPermission()&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="230" y="620" width="155" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-cm-repos" value="repos/&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;onSnapshot · transactions&lt;br/&gt;placeOrder/acceptOrder&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="400" y="620" width="155" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-cm-auth" value="auth/&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;configureGoogleSignIn&lt;br/&gt;signInWithCredential&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="570" y="620" width="150" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-cm-fb" value="firebase/client&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;initFirebase · getDb&lt;br/&gt;AsyncStorage persistence&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="695" width="155" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-cm-otp" value="otp/  ⚠&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Fast2SMS sender, dev-grade&lt;br/&gt;codes live in Firestore&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="230" y="695" width="155" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-cm-util" value="util/&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;notify · email · payment (UPI deep link) · pricing · time (shop hours) · search · format&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="400" y="695" width="320" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- Firebase -->
+        <mxCell id="p1-fb-auth" value="Firebase Authentication&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Google provider only (idToken)&lt;br/&gt;uid = identity key everywhere&lt;br/&gt;session persisted in AsyncStorage&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="830" y="130" width="265" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-fb-fcm" value="Firebase Cloud Messaging&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;HTTP v1 API (OAuth2 service account)&lt;br/&gt;device tokens from expo-notifications&lt;br/&gt;high-priority admin order alerts&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1125" y="130" width="265" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-fb-fs" value="Cloud Firestore  —  firestore.rules = role-based access control  ·  firestore.indexes.json = 10 composite indexes" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="830" y="275" width="560" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-users" value="users/{uid}&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;role source of truth&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="845" y="320" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-pending" value="pendingUsers/{uid}&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;role requests&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="985" y="320" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-shops" value="shops/{shopId}&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;hours · UPI · discount&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1125" y="320" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-cat" value="categories/&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;shopId + order&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1265" y="320" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-prod" value="products/&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;stock · price · onDemand&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="845" y="370" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-img" value="images/{id}&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;base64 blobs (no GCS)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="985" y="370" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-emp" value="employees/&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;invited/active/disabled&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1125" y="370" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-cust" value="customers/{uid}&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;addresses[] · watchlist&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1265" y="370" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-orders" value="orders/&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;statusLog · changeLog&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#d79b00;fontSize=9;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="845" y="420" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-coupons" value="coupons/{CODE}&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;flat/percent/free-delivery&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="985" y="420" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-zones" value="deliveryZones/{pin}&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;fee · freeAbove&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1125" y="420" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-push" value="pushTokens/{uid}&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;token · kind · roles[]&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1265" y="420" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-secrets" value="secrets/{id}  ⚠&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;readable by any signed-in user&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="845" y="470" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-otps" value="otps/{id}  ⚠&lt;br/&gt;&lt;font style=&quot;font-size:8px&quot;&gt;dev-grade, client-side&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="985" y="470" width="125" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-col-note" value="Storage rules exist but Cloud Storage is UNUSED&lt;br/&gt;(images are base64 docs to stay on Spark)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;dashed=1;fontSize=9;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="1125" y="470" width="265" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Worker -->
+        <mxCell id="p1-wk-http" value="HTTP handler — POST /&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Authorization: Bearer &amp;lt;Firebase ID token&amp;gt;&lt;br/&gt;events: new-order · order-status ·&lt;br/&gt;back-in-stock · email&lt;br/&gt;⚠ claims-only token check (no RS256 verify)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="825" y="620" width="275" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-wk-cron" value="Cron trigger &quot;* * * * *&quot;&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;re-reminder sweep:&lt;br/&gt;orders where status = &quot;new&quot;&lt;br/&gt;older than 30 s, max 15 reminders&lt;br/&gt;→ re-ping admin devices&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1125" y="620" width="265" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- External -->
+        <mxCell id="p1-ex-gsi" value="Google Sign-In SDK&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;native account picker&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="870" width="230" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-ex-oauth" value="Google OAuth2 token endpoint&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;service-account JWT → access token&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="330" y="870" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-ex-rest" value="Firestore REST API&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;used by the Worker (runQuery)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="610" y="870" width="230" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-ex-gmail" value="Gmail API&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;welcome + order-bill emails&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="870" y="870" width="230" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-ex-sms" value="Fast2SMS (OTP — optional/dev)&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;⚠ API key stored in Firestore&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="870" width="230" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell id="p1-e1" value="imports" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;fontSize=9;" edge="1" parent="1" source="p1-buyer-lib" target="p1-c2">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="225" y="520" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="p1-e2" value="imports" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;fontSize=9;" edge="1" parent="1" source="p1-admin-lib" target="p1-c2">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="560" y="520" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="p1-e3" value="Firebase JS SDK v13&lt;br/&gt;onSnapshot · getDocs · runTransaction" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="p1-cm-repos" target="p1-fb-fs">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="770" y="652" /><mxPoint x="770" y="292" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="p1-e4" value="signInWithCredential(idToken)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="p1-cm-auth" target="p1-fb-auth">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="780" y="652" /><mxPoint x="780" y="185" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="p1-e5" value="HTTPS POST + ID token" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="p1-cm-util" target="p1-wk-http">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-e6" value="FCM HTTP v1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="p1-wk-http" target="p1-fb-fcm">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1450" y="690" /><mxPoint x="1450" y="185" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="p1-e7" value="REST read" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;dashed=1;fontSize=9;" edge="1" parent="1" source="p1-wk-http" target="p1-ex-rest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-e8" value="send mail" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#b85450;dashed=1;fontSize=9;" edge="1" parent="1" source="p1-wk-http" target="p1-ex-gmail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-e9" value="SA JWT" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#b85450;dashed=1;fontSize=9;" edge="1" parent="1" source="p1-wk-http" target="p1-ex-oauth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-e10" value="push delivery → devices" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=2;dashed=1;fontSize=9;" edge="1" parent="1" source="p1-fb-fcm" target="p1-c1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1258" y="60" /><mxPoint x="390" y="60" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="p1-e11" value="idToken" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#b85450;dashed=1;fontSize=9;" edge="1" parent="1" source="p1-cm-auth" target="p1-ex-gsi">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1-e12" value="OTP send" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#b85450;dashed=1;fontSize=9;" edge="1" parent="1" source="p1-cm-otp" target="p1-ex-sms">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p1-legend" value="&lt;b&gt;Legend&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; ▬ solid = synchronous call&amp;nbsp;&amp;nbsp;&amp;nbsp; ┄ dashed = fire-and-forget / best-effort&amp;nbsp;&amp;nbsp;&amp;nbsp; ⚠ = known risk to fix before public release" style="text;html=1;align=left;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="40" y="975" width="1380" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 2 — ORDER LIFECYCLE                                              -->
+  <!-- ===================================================================== -->
+  <diagram id="page-order" name="2 · Order Lifecycle">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1450" pageHeight="1120" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="p2-title" value="Order Lifecycle — buyer → Firestore → notify Worker → admin" style="text;html=1;align=center;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1340" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2-l1" value="BUYER APP" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontStyle=1;opacity=30;" vertex="1" parent="1">
+          <mxGeometry x="40" y="60" width="300" height="1000" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-l2" value="CLOUD FIRESTORE" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=top;fontStyle=1;opacity=30;" vertex="1" parent="1">
+          <mxGeometry x="370" y="60" width="300" height="1000" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-l3" value="NOTIFY WORKER" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontStyle=1;opacity=30;" vertex="1" parent="1">
+          <mxGeometry x="700" y="60" width="280" height="1000" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-l4" value="ADMIN APP" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;fontStyle=1;opacity=30;" vertex="1" parent="1">
+          <mxGeometry x="1010" y="60" width="300" height="1000" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2-b1" value="1 · Sign in with Google" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="65" y="110" width="250" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-b2" value="2 · Browse catalog&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;live onSnapshot(products where shopId, active)&lt;br/&gt;featured row · category filter · search&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="65" y="185" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-b3" value="3 · Add to cart&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;CartProvider (in-memory context)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="65" y="275" width="250" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-b4" value="4 · Checkout&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;pick/create address → pincode lookup&lt;br/&gt;delivery fee (freeAbove) → coupon validate&lt;br/&gt;shop-open check (operatingHours / forceClosed)&lt;br/&gt;payment mode: COD or UPI deep link&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="65" y="350" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-b5" value="5 · placeOrder()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="65" y="470" width="250" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-b9" value="11 · Order history updates live&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;onSnapshot(orders where customerId == uid&lt;br/&gt;order by createdAt desc) + paging&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="65" y="840" width="250" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-b10" value="12 · 🔔 &quot;Order update&quot; push&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;+ bill email (Gmail)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="65" y="945" width="250" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2-f1" value="customers/{uid}&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;upsertCustomerForUser()&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="395" y="110" width="250" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-f2" value="products / categories / images&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;readable by any signed-in user&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="395" y="185" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-f4" value="deliveryZones/{pincode}&lt;br/&gt;coupons/{CODE}&lt;br/&gt;shops/{shopId}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="395" y="350" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-f5" value="6 · orders/{id} created&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;status = &quot;new&quot;, paymentStatus = &quot;pending&quot;&lt;br/&gt;items[] + address + totals snapshotted&lt;br/&gt;statusLog[] seeded&lt;br/&gt;&lt;i&gt;rule: customerId must == request.auth.uid&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#d79b00;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="395" y="460" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-f7" value="9 · acceptOrder() transaction&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;for each trackStock item: stock -= qty&lt;br/&gt;order.status = &quot;accepted&quot;&lt;br/&gt;stockApplied = true, assignedTo = uid&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#d79b00;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="395" y="700" width="250" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-f8" value="10 · edits &amp;amp; transitions&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;changeLog[] (type, by, note, delta)&lt;br/&gt;amountDelta accumulates refund / extra-pay&lt;br/&gt;cancel → restock if stockApplied&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="395" y="815" width="250" height="85" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2-w1" value="7 · POST notifyUrl&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;{ event: &quot;new-order&quot;, shopId, orderId }&lt;br/&gt;Bearer Firebase ID token&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="720" y="460" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-w2" value="8 · resolve recipients&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;pushTokens where kind = &quot;admin&quot;&lt;br/&gt;∧ roles ∩ {sales, admin, superuser}&lt;br/&gt;∧ notify ≠ false&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="720" y="555" width="240" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-w3" value="FCM v1 high-priority send" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="720" y="655" width="240" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-wcron" value="⏱ cron sweep (every minute)&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;order still &quot;new&quot; after 30 s → re-ring&lt;br/&gt;up to 15 reminders, stamps lastRemindedAt&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="725" width="240" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-w4" value="POST { event: &quot;order-status&quot; }&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;→ pushTokens/{customerId}&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="720" y="880" width="240" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-w5" value="POST { event: &quot;email&quot; }&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Gmail API → order bill&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="720" y="955" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2-a1" value="🔔 Ring + banner&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;channel &quot;orders&quot; · IMPORTANCE_MAX&lt;br/&gt;order_ring.wav + vibration&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1035" y="555" width="250" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-a2" value="Orders list (live)&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;onSnapshot(orders, shopId + status, createdAt desc)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1035" y="640" width="250" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-a3" value="Accept order&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;requires permission orders.serve&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1035" y="715" width="250" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-a4" value="Edit items · assign employee · change status&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;new → accepted → out_for_delivery → served&lt;br/&gt;(cancelled at any point → restock)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1035" y="790" width="250" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="p2-a5" value="updateOrderStatus() → notify customer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1035" y="890" width="250" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Status machine inset -->
+        <mxCell id="p2-sm" value="Order status machine:&amp;nbsp;&amp;nbsp; new → accepted → out_for_delivery → served&amp;nbsp;&amp;nbsp;|&amp;nbsp;&amp;nbsp; any → cancelled (restock if stockApplied)&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp; paymentStatus: pending → claimed → verified" style="text;html=1;align=center;fontSize=12;fontStyle=1;fillColor=#f5f5f5;strokeColor=#999999;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1070" width="1270" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- edges -->
+        <mxCell id="p2-eA" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-b1" target="p2-f1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eB" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;" edge="1" parent="1" source="p2-f2" target="p2-b2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-b2" target="p2-b3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eD" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-b3" target="p2-b4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eE" value="read" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;" edge="1" parent="1" source="p2-b4" target="p2-f4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eF" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-b4" target="p2-b5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eG" value="addDoc" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="p2-b5" target="p2-f5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eH" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" parent="1" source="p2-f5" target="p2-w1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eI" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-w1" target="p2-w2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eJ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-w2" target="p2-w3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eK" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" parent="1" source="p2-w3" target="p2-a1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;" edge="1" parent="1" source="p2-wcron" target="p2-a1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eM" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-a1" target="p2-a2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eN" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-a2" target="p2-a3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eO" value="runTransaction" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="p2-a3" target="p2-f7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eP" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-a3" target="p2-a4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eQ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-a4" target="p2-f8"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eR" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-a4" target="p2-a5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p2-a5" target="p2-w4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eT" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" parent="1" source="p2-w4" target="p2-b10"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eU" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;" edge="1" parent="1" source="p2-w5" target="p2-b10"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p2-eV" value="live" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;" edge="1" parent="1" source="p2-f8" target="p2-b9"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 3 — PUSH NOTIFICATION ARCHITECTURE                               -->
+  <!-- ===================================================================== -->
+  <diagram id="page-push" name="3 · Push &amp; Email Pipeline">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1350" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="p3-title" value="Push &amp; Email Pipeline — FCM HTTP v1 via Cloudflare Worker (no Blaze plan required)" style="text;html=1;align=center;fontSize=19;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="10" width="1290" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3-s1" value="A · TOKEN REGISTRATION" style="text;html=1;align=left;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="60" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-1" value="App sign-in (buyer or admin)&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;AuthProvider detects Firebase user&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="90" width="230" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-2" value="registerForPush(uid[, roles])&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;expo-notifications&lt;br/&gt;requestPermissionsAsync()&lt;br/&gt;getDevicePushTokenAsync() → FCM token&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="180" width="230" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-3" value="Admin only: create channel &quot;orders&quot;&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;importance MAX · order_ring.wav&lt;br/&gt;custom vibration pattern&lt;br/&gt;notification handler shows banner + sound&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="295" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-4" value="pushTokens/{uid}&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;{ token, kind: &quot;admin&quot;|&quot;buyer&quot;,&lt;br/&gt;role, roles[], notify, updatedAt }&lt;br/&gt;&lt;i&gt;rule: only the owner may write&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="330" y="180" width="250" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3-s2" value="B · TRIGGERS" style="text;html=1;align=left;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="330" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-5" value="&lt;b&gt;Event sources&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;• buyer placed an order → &lt;b&gt;new-order&lt;/b&gt;&lt;br/&gt;• admin changed status → &lt;b&gt;order-status&lt;/b&gt;&lt;br/&gt;• product restocked → &lt;b&gt;back-in-stock&lt;/b&gt;&lt;br/&gt;• welcome / order bill → &lt;b&gt;email&lt;/b&gt;&lt;br/&gt;• cron sweep → repeat &lt;b&gt;new-order&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="330" y="360" width="250" height="125" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3-s3" value="C · CLIENT → WORKER" style="text;html=1;align=left;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="640" y="150" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-6" value="common/util/notify.ts&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;sendNotify(event) / sendEmail()&lt;br/&gt;POST {notifyUrl} with&lt;br/&gt;Authorization: Bearer &amp;lt;Firebase ID token&amp;gt;&lt;br/&gt;&lt;i&gt;fire-and-forget — never blocks the UI&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="640" y="180" width="260" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-7" value="&lt;b&gt;Cloudflare Worker · functions/notify/src&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;1. parse body, check Bearer token&lt;br/&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;⚠ claims-only (aud/iss/exp), no signature verify&lt;br/&gt;2. sign service-account JWT (Web Crypto)&lt;br/&gt;3. exchange for Google OAuth2 access token&lt;br/&gt;4. resolve recipients via Firestore REST&lt;br/&gt;5. POST FCM v1 messages:send per token&lt;br/&gt;6. return { sent, failed }&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="640" y="330" width="260" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-8" value="⏱ scheduled() — cron &quot;* * * * *&quot;&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;scan orders status = &quot;new&quot;&lt;br/&gt;age &amp;gt; 30 s and reminders &amp;lt; 15&lt;br/&gt;→ re-notify admins, bump counter&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="640" y="540" width="260" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3-s4" value="D · GOOGLE APIS &amp; DELIVERY" style="text;html=1;align=left;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="960" y="150" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-9" value="Google OAuth2&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;oauth2.googleapis.com/token&lt;br/&gt;secret: FIREBASE_SERVICE_ACCOUNT&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="960" y="180" width="240" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-10" value="Firestore REST&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;GET pushTokens/{uid}&lt;br/&gt;runQuery: customers where&lt;br/&gt;notifyBackInStock ARRAY_CONTAINS productId&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="960" y="270" width="240" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-11" value="FCM HTTP v1&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;projects/{projectId}/messages:send&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="960" y="385" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-12" value="Gmail API&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;GMAIL_CLIENT_ID / SECRET /&lt;br/&gt;REFRESH_TOKEN / SENDER&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="960" y="470" width="240" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-13" value="🔔 Admin devices&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;ringing order alert, works in background&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="960" y="585" width="240" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="p3-14" value="📱 Buyer devices&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;order-status / back-in-stock&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="960" y="665" width="240" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3-e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p3-1" target="p3-2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p3-2" target="p3-3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e3" value="setPushToken()" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;" edge="1" parent="1" source="p3-2" target="p3-4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p3-5" target="p3-6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" parent="1" source="p3-6" target="p3-7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e6" value="2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;" edge="1" parent="1" source="p3-7" target="p3-9"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e7" value="3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;" edge="1" parent="1" source="p3-7" target="p3-10"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e8" value="4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="p3-7" target="p3-11"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;" edge="1" parent="1" source="p3-7" target="p3-12"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" parent="1" source="p3-11" target="p3-13"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" parent="1" source="p3-11" target="p3-14"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;" edge="1" parent="1" source="p3-8" target="p3-7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p3-e13" value="read tokens" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;" edge="1" parent="1" source="p3-4" target="p3-10"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="455" y="150" /><mxPoint x="1080" y="150" /></Array></mxGeometry>
+        </mxCell>
+
+        <mxCell id="p3-risk" value="&lt;b&gt;⚠ Hardening required before public launch:&lt;/b&gt; the Worker accepts any syntactically valid ID token without RS256 signature verification, so an attacker who knows the notify URL can trigger arbitrary pushes and emails. Verify the token against Google&#39;s public JWKs (or add a shared secret / Cloudflare Access) before going to Production." style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=10;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="40" y="700" width="880" height="70" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 4 — AUTH & RBAC                                                  -->
+  <!-- ===================================================================== -->
+  <diagram id="page-auth" name="4 · Auth &amp; RBAC">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1350" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="p4-title" value="Authentication &amp; Role-Based Access Control" style="text;html=1;align=center;fontSize=19;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="10" width="1290" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p4-1" value="Tap &quot;Sign in with Google&quot;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="60" y="90" width="240" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-2" value="@react-native-google-signin&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;configured with googleWebClientId&lt;br/&gt;(OAuth client_type 3 from google-services.json)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="60" y="165" width="240" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-3" value="Firebase Auth&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;signInWithCredential(idToken)&lt;br/&gt;→ User { uid, email, displayName }&lt;br/&gt;session persisted via AsyncStorage&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="270" width="240" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-4" value="subscribeToAuth() fires" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="60" y="385" width="240" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-5" value="Which app?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="110" y="455" width="140" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- buyer branch -->
+        <mxCell id="p4-b1" value="BUYER" style="text;html=1;align=center;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="440" width="260" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-b2" value="upsertCustomerForUser(shopId, uid)&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;creates/merges customers/{uid}&lt;br/&gt;(doc id == uid, so rules allow self-access)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="380" y="470" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-b3" value="registerForPush(uid) → pushTokens/{uid} kind=&quot;buyer&quot;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="380" y="560" width="260" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-b4" value="first sign-in → welcome email (Worker, best-effort)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="630" width="260" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-b5" value="→ /(shop)/(tabs)/home&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;no role needed — every signed-in user can shop&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="380" y="700" width="260" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- admin branch -->
+        <mxCell id="p4-a1" value="ADMIN" style="text;html=1;align=center;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="90" width="260" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-a2" value="fetchAppUser(uid) → users/{uid}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="380" y="120" width="260" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-a3" value="doc exists&lt;br/&gt;with a role?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="440" y="195" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-a4" value="NO → upsertPendingUser()&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;pendingUsers/{uid} = { email, name }&lt;br/&gt;stay on sign-in: &quot;waiting for approval&quot;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="380" y="310" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-a5" value="Manager opens (app)/roles&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;needs permission roles.manage&lt;br/&gt;grants role → writes users/{uid}&lt;br/&gt;only a superuser can mint a superuser&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="700" y="310" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p4-a6" value="YES → (app)/dashboard&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;registerForPush(uid, roles) → pushTokens kind=&quot;admin&quot;&lt;br/&gt;UI gated by userHasPermission()&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="700" y="120" width="260" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- role matrix -->
+        <mxCell id="p4-roles" value="&lt;b&gt;Roles → permissions (common/src/roles)&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b&gt;superuser&lt;/b&gt; — everything, bypasses the &lt;i&gt;active&lt;/i&gt; flag&lt;br/&gt;&lt;b&gt;admin&lt;/b&gt; — shop.config, sales.discount, sales.override, roles.manage, reads&lt;br/&gt;&lt;b&gt;product-manager&lt;/b&gt; — products.read/write, categories.write&lt;br/&gt;&lt;b&gt;employee-manager&lt;/b&gt; — employees.read/write, roles.manage&lt;br/&gt;&lt;b&gt;customer-manager&lt;/b&gt; — customers.read/write&lt;br/&gt;&lt;b&gt;sales&lt;/b&gt; — orders.read, orders.serve&lt;br/&gt;&lt;b&gt;analytics&lt;/b&gt; — analytics.read, orders.read&lt;br/&gt;&lt;br/&gt;Multi-role: &lt;i&gt;roles[]&lt;/i&gt; is evaluated as a union; legacy single &lt;i&gt;role&lt;/i&gt; is the fallback.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="120" width="320" height="230" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p4-enf" value="&lt;b&gt;Two-layer enforcement&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b&gt;1 · Client (UX only)&lt;/b&gt; — AuthProvider caches AppUser; screens and buttons are hidden via userHasPermission().&lt;br/&gt;&lt;b&gt;2 · Firestore rules (real security)&lt;/b&gt; — every read/write re-reads users/{uid} and checks role ∈ allowed set &amp;amp;&amp;amp; active == true.&lt;br/&gt;&lt;br/&gt;Note: roles live in Firestore documents, &lt;b&gt;not&lt;/b&gt; in custom auth claims, so each rule evaluation costs an extra document read (billed, but free-tier friendly at this scale).&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="380" width="320" height="200" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p4-emp" value="&lt;b&gt;Employee onboarding (separate from roles)&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;employee-manager invites → employees/{id} with status &quot;invited&quot; + onboardingToken → employee completes profile (photo / proof / DOB / address, stored as base64 images/) → status &quot;active&quot;. Rules let an employee update &lt;i&gt;their own&lt;/i&gt; record during onboarding.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="700" y="430" width="260" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p4-e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p4-1" target="p4-2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e2" value="idToken" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;" edge="1" parent="1" source="p4-2" target="p4-3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p4-3" target="p4-4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p4-4" target="p4-5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e5" value="admin-app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;" edge="1" parent="1" source="p4-5" target="p4-a2"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="340" y="495" /><mxPoint x="340" y="142" /></Array></mxGeometry></mxCell>
+        <mxCell id="p4-e6" value="buyer-app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;" edge="1" parent="1" source="p4-5" target="p4-b2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p4-a2" target="p4-a3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e8" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;" edge="1" parent="1" source="p4-a3" target="p4-a4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e9" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;" edge="1" parent="1" source="p4-a3" target="p4-a6"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="660" y="235" /><mxPoint x="660" y="157" /></Array></mxGeometry></mxCell>
+        <mxCell id="p4-e10" value="approve" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;" edge="1" parent="1" source="p4-a4" target="p4-a5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e11" value="re-sign-in" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;fontSize=9;" edge="1" parent="1" source="p4-a5" target="p4-a6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p4-b2" target="p4-b3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p4-b3" target="p4-b4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p4-e14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p4-b4" target="p4-b5"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 5 — FIRESTORE DATA MODEL                                         -->
+  <!-- ===================================================================== -->
+  <diagram id="page-data" name="5 · Firestore Data Model">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1450" pageHeight="950" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="p5-title" value="Firestore Data Model (collections, key fields, relationships)" style="text;html=1;align=center;fontSize=19;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="10" width="1390" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5-shop" value="&lt;b&gt;shops/{shopId}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;name&lt;br/&gt;salesDiscountPercent&lt;br/&gt;operatingHours[7]&lt;br/&gt;forceClosed&lt;br/&gt;upiVpa · upiPayeeName&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="600" y="70" width="210" height="130" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5-cat" value="&lt;b&gt;categories/{id}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;shopId → shops&lt;br/&gt;name · order&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="60" y="90" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p5-prod" value="&lt;b&gt;products/{id}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;shopId · categoryId → categories&lt;br/&gt;name · description · unit&lt;br/&gt;price · discountPrice · priceUpdatedAt&lt;br/&gt;active · featured · perishable&lt;br/&gt;trackStock · stock · stockUpdatedAt&lt;br/&gt;onDemand · prepTime&lt;br/&gt;imageId → images&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="60" y="230" width="230" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="p5-img" value="&lt;b&gt;images/{id}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;base64 data (Cloud Storage avoided&lt;br/&gt;to stay on the Spark plan)&lt;br/&gt;cached client-side by use-cached-image&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="60" y="430" width="230" height="95" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5-cust" value="&lt;b&gt;customers/{uid}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;shopId · uid (== doc id)&lt;br/&gt;name · email · phone · locale&lt;br/&gt;addresses[]: { id, label, door, street,&lt;br/&gt;&amp;nbsp;&amp;nbsp;city, pincode, landmark }&lt;br/&gt;defaultAddressId&lt;br/&gt;notifyBackInStock[] → productIds&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="600" y="260" width="250" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5-order" value="&lt;b&gt;orders/{id}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;shopId · customerId → customers&lt;br/&gt;customerName · customerPhone (snapshot)&lt;br/&gt;items[]: { productId, name, price, qty }&lt;br/&gt;subtotal · deliveryFee · couponCode&lt;br/&gt;discount · total · grandTotal · amountDelta&lt;br/&gt;paymentMode cod|upi · paymentStatus · upiRef&lt;br/&gt;address{} · pincode (snapshot)&lt;br/&gt;status: new|accepted|out_for_delivery|&lt;br/&gt;&amp;nbsp;&amp;nbsp;served|cancelled&lt;br/&gt;stockApplied · assignedTo → users&lt;br/&gt;note · statusLog[] · changeLog[]&lt;br/&gt;createdAt · reminders · lastRemindedAt&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#ffcc99;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="600" y="470" width="290" height="245" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5-coupon" value="&lt;b&gt;coupons/{CODE}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;shopId · discountType flat|percent|none&lt;br/&gt;value · maxDiscount&lt;br/&gt;freeDelivery · minOrder · active&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="990" y="470" width="230" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="p5-zone" value="&lt;b&gt;deliveryZones/{pincode}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;serviceable · deliveryFee · freeAbove&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="990" y="610" width="230" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5-user" value="&lt;b&gt;users/{uid}&lt;/b&gt;  ← RBAC source of truth&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;email · name · shopId&lt;br/&gt;role (legacy) · roles[] (union)&lt;br/&gt;active · createdAt&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="990" y="70" width="250" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p5-pending" value="&lt;b&gt;pendingUsers/{uid}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;email · name · createdAt&lt;br/&gt;self-created role request&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="990" y="210" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p5-emp" value="&lt;b&gt;employees/{id}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;shopId · uid → users&lt;br/&gt;name · email · dob · address&lt;br/&gt;photoImageId · proofImageId → images&lt;br/&gt;status invited|active|disabled&lt;br/&gt;onboardingToken&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="990" y="320" width="250" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5-push" value="&lt;b&gt;pushTokens/{uid}&lt;/b&gt;&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;token · kind admin|buyer&lt;br/&gt;role · roles[] · notify&lt;br/&gt;updatedAt&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="330" y="600" width="210" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="p5-secrets" value="&lt;b&gt;secrets/{id}&lt;/b&gt;  ⚠&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;fast2sms API key&lt;br/&gt;readable by ANY signed-in user&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="60" y="600" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p5-otp" value="&lt;b&gt;otps/{id}&lt;/b&gt;  ⚠&lt;hr/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;target · code · expiresAt&lt;br/&gt;attempts · consumed&lt;br/&gt;generated &amp;amp; verified client-side&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="60" y="720" width="210" height="95" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5-idx" value="&lt;b&gt;Composite indexes (firestore.indexes.json)&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;categories: shopId, order&lt;br/&gt;products: shopId, name&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;shopId, categoryId, name&lt;br/&gt;employees: shopId, name&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;customers: shopId, name&lt;br/&gt;customers: shopId, notifyBackInStock (array-contains)&lt;br/&gt;orders: shopId, createdAt↓&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;shopId, status, createdAt↓&lt;br/&gt;orders: customerId, createdAt↓&lt;br/&gt;otps: target, consumed, createdAt↓&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=10;verticalAlign=top;spacingTop=6;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="600" y="760" width="620" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5-e1" value="shopId" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;" edge="1" parent="1" source="p5-cat" target="p5-shop"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p5-e2" value="categoryId" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;" edge="1" parent="1" source="p5-prod" target="p5-cat"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p5-e3" value="imageId" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;" edge="1" parent="1" source="p5-prod" target="p5-img"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p5-e4" value="customerId" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;strokeWidth=2;" edge="1" parent="1" source="p5-order" target="p5-cust"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p5-e5" value="items[].productId&lt;br/&gt;(denormalised snapshot)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;dashed=1;" edge="1" parent="1" source="p5-order" target="p5-prod"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="420" y="592" /><mxPoint x="420" y="310" /></Array></mxGeometry></mxCell>
+        <mxCell id="p5-e6" value="couponCode" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;" edge="1" parent="1" source="p5-order" target="p5-coupon"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p5-e7" value="pincode" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;" edge="1" parent="1" source="p5-order" target="p5-zone"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p5-e8" value="assignedTo" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;dashed=1;" edge="1" parent="1" source="p5-order" target="p5-user"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1300" y="592" /><mxPoint x="1300" y="125" /></Array></mxGeometry></mxCell>
+        <mxCell id="p5-e9" value="approved into" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;dashed=1;" edge="1" parent="1" source="p5-pending" target="p5-user"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p5-e10" value="uid" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;dashed=1;" edge="1" parent="1" source="p5-emp" target="p5-user"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p5-e11" value="same uid" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;dashed=1;" edge="1" parent="1" source="p5-push" target="p5-cust"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p5-e12" value="notifyBackInStock[]" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;dashed=1;" edge="1" parent="1" source="p5-cust" target="p5-prod"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p5-e13" value="shopId" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;endArrow=open;" edge="1" parent="1" source="p5-cust" target="p5-shop"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 6 — BUILD & PLAY STORE RELEASE PIPELINE                          -->
+  <!-- ===================================================================== -->
+  <diagram id="page-release" name="6 · Build &amp; Play Store Release">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1450" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="p6-title" value="Build &amp; Release Pipeline — from monorepo to Google Play" style="text;html=1;align=center;fontSize=19;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="10" width="1390" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- current state -->
+        <mxCell id="p6-cur" value="CURRENT STATE (what you have today)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1;align=left;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="400" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-c1" value="npm workspaces&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;common · admin-app · buyer-app&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="70" y="110" width="340" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-c2" value="scripts/build-apk.sh &amp;lt;admin|buyer&amp;gt; [debug|release]&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;ensure_jdk17 · ensure_android_sdk&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="70" y="180" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-c3" value="npx expo prebuild --platform android&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;⚠ regenerates android/ — hand edits to&lt;br/&gt;build.gradle can be overwritten&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="70" y="255" width="340" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-c4" value="./gradlew assembleDebug / assembleRelease&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;→ app-debug.apk / app-release.apk&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="70" y="340" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-c5" value="❌ NOT PUBLISHABLE&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;• release block uses signingConfigs.debug&lt;br/&gt;• Play requires .aab, not .apk&lt;br/&gt;• versionCode is still 1&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="70" y="410" width="340" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- release path -->
+        <mxCell id="p6-rel" value="RELEASE PATH (what to do)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1;align=left;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="480" y="70" width="440" height="860" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-r1" value="1 · Create an upload keystore per app&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;keytool -genkeypair -v -keyalg RSA -keysize 2048&lt;br/&gt;-validity 10000 -alias upload -keystore upload.jks&lt;br/&gt;&lt;b&gt;back it up — losing it means losing the app&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="510" y="110" width="380" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-r2" value="2 · Wire the signing config so prebuild can&#39;t wipe it&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Option A (recommended): EAS Build — credentials&lt;br/&gt;managed remotely, eas build -p android --profile production&lt;br/&gt;Option B: commit android/ (bare workflow) + read the&lt;br/&gt;keystore path/password from ~/.gradle/gradle.properties or env&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="510" y="205" width="380" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-r3" value="3 · Bump versionCode / versionName&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;app.json expo.version + android.versionCode&lt;br/&gt;every upload needs a strictly higher versionCode&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="510" y="320" width="380" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-r4" value="4 · Build an Android App Bundle&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;cd android &amp;amp;&amp;amp; ./gradlew bundleRelease&lt;br/&gt;→ app/build/outputs/bundle/release/app-release.aab&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="510" y="405" width="380" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-r5" value="5 · ⚠ CRITICAL — register the signing SHA-1 fingerprints&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Google Sign-In breaks on the Play build unless you add BOTH:&lt;br/&gt;• your &lt;b&gt;upload key&lt;/b&gt; SHA-1, and&lt;br/&gt;• the &lt;b&gt;Play App Signing key&lt;/b&gt; SHA-1 (Play Console → Setup → App signing)&lt;br/&gt;to Firebase Console → Project settings → Android app,&lt;br/&gt;then re-download google-services.json for BOTH apps.&lt;br/&gt;Today it only lists the Expo debug keystore hash.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="510" y="490" width="380" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-r6" value="6 · Play Console setup (per app)&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;developer account ($25 one-off) → create app&lt;br/&gt;store listing · screenshots · feature graphic&lt;br/&gt;privacy policy URL (mandatory)&lt;br/&gt;Data safety form · content rating · target audience&lt;br/&gt;App access: supply reviewer test credentials&lt;br/&gt;(admin app also needs a pre-granted role)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="510" y="640" width="380" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-r7" value="7 · Tracks: Internal testing → Closed testing → Production&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;new personal developer accounts must run closed testing&lt;br/&gt;with 12+ testers for 14 days before production access&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="510" y="770" width="380" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-r8" value="8 · 🚀 Live on Google Play" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="510" y="860" width="380" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- backend deploy -->
+        <mxCell id="p6-be" value="BACKEND DEPLOY (independent of the store)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1;align=left;spacingLeft=10;spacingTop=6;" vertex="1" parent="1">
+          <mxGeometry x="960" y="70" width="420" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-b1" value="firebase deploy --only firestore:rules,firestore:indexes&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;firebase.json points at firebase/firestore.rules + indexes&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="990" y="110" width="360" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-b2" value="wrangler deploy (functions/notify)&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;secrets: FIREBASE_SERVICE_ACCOUNT, GMAIL_CLIENT_ID,&lt;br/&gt;GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER&lt;br/&gt;cron trigger &quot;* * * * *&quot;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="990" y="190" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p6-b3" value="notifyUrl must point at the deployed Worker&lt;br/&gt;&lt;font style=&quot;font-size:9px&quot;&gt;set in app.local.json (gitignored), merged by app.config.js&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="990" y="290" width="360" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- blockers -->
+        <mxCell id="p6-blk" value="&lt;b&gt;⚠ Fix before the Production track&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot;&gt;1. Worker does not verify the ID-token signature → anyone can trigger pushes/emails.&lt;br/&gt;2. secrets/fast2sms is readable by every signed-in user → move the key to a Worker secret.&lt;br/&gt;3. OTP codes are generated and verified client-side in Firestore → move server-side or drop the feature.&lt;br/&gt;4. Admin app is staff-only: prefer Internal testing / Closed testing / Managed Google Play rather than a public Production listing.&lt;br/&gt;5. Data safety form must declare: name, email, phone, delivery address, purchase history, device push token.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="960" y="430" width="420" height="200" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p6-e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p6-c1" target="p6-c2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p6-c2" target="p6-c3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p6-c3" target="p6-c4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p6-c4" target="p6-c5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" parent="1" source="p6-c5" target="p6-r1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p6-r1" target="p6-r2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p6-r2" target="p6-r3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p6-r3" target="p6-r4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p6-r4" target="p6-r5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p6-r5" target="p6-r6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="p6-r6" target="p6-r7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="p6-e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" parent="1" source="p6-r7" target="p6-r8"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+</mxfile>

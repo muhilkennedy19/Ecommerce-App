@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Expo / Metro
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# Native build artifacts (Continuous Native Generation)
+/android/
+/ios/
+admin-app/android/
+admin-app/ios/
+buyer-app/android/
+buyer-app/ios/
+
+# Secrets / local config — DO NOT COMMIT
+**/google-services.json
+**/GoogleService-Info.plist
+*.keystore
+*.jks
+*.p8
+*.p12
+*.key
+**/service-account*.json
+.env
+.env*.local
+.dev.vars
+
+# Local-only Expo config overrides (private endpoints) — see app.local.example.json
+**/app.local.json
+
+# Cloudflare Wrangler
+.wrangler/
+
+# OS / editor
+.DS_Store
+*.log
+npm-debug.*
+.idea/
+.vscode/

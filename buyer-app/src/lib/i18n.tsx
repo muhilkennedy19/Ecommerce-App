@@ -1,0 +1,719 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+
+/**
+ * Tiny custom i18n for the buyer app (no native i18n library available).
+ *
+ * NOTE ON TRANSLATIONS:
+ *   - `en` is the source of truth and is always fully populated.
+ *   - `ta` (Tamil), `hi` (Hindi) and `kn` (Kannada) are MACHINE TRANSLATIONS
+ *     pending review by a native speaker. Treat them as provisional.
+ *   - `t(key, fallback, params)` always falls back to the English `fallback`
+ *     text, so a missing/untranslated key still renders English — never a raw
+ *     dot-key.
+ */
+
+export type Loc = 'en' | 'ta' | 'hi' | 'kn';
+
+export const LOCALES: { code: Loc; label: string }[] = [
+  { code: 'en', label: 'English' },
+  { code: 'ta', label: 'தமிழ்' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'kn', label: 'ಕನ್ನಡ' },
+];
+
+const STORAGE_KEY = 'locale';
+const DEFAULT_LOCALE: Loc = 'en';
+
+const en: Record<string, string> = {
+  // common
+  'common.save': 'Save',
+  'common.saved': 'Saved ✓',
+  'common.couldNotSave': 'Could not save',
+  'common.tryAgain': 'Please try again.',
+  'common.delete': 'Delete',
+  'common.remove': 'Remove',
+  'common.addToCart': 'Add to cart',
+  'common.checkout': 'Checkout',
+  'common.outOfStock': 'Out of stock',
+  'common.unavailable': 'Unavailable',
+  'common.shopClosed': 'The shop is not accepting orders right now.',
+  'common.phoneNumber': 'Phone number',
+
+  // tabs
+  'tabs.shop': 'Shop',
+  'tabs.orders': 'Orders',
+  'tabs.profile': 'Profile',
+
+  // sign-in
+  'signin.brand': 'Shop',
+  'signin.buyer': 'Buyer',
+  'signin.setupRequired': 'Setup required',
+  'signin.setupHint':
+    'Replace the REPLACE_ME values in {path} with your Firebase config and Google web client ID, then reload. See the README.',
+  'signin.google': 'Sign in with Google',
+  'signin.subtitle': 'Sign in to browse the shop and place orders.',
+  'signin.failed': 'Sign-in failed',
+
+  // home
+  'home.closed': 'Not accepting orders right now — back soon!',
+  'home.loading': 'Loading products…',
+  'home.featured': 'Featured',
+  'home.categories': 'Categories',
+  'home.all': 'All',
+  'home.products': 'Products',
+  'home.search': 'Search products',
+  'home.noProducts': 'No products',
+  'home.noMatch': 'No products match "{q}"',
+  'home.noneInCategory': 'Nothing available in this category yet.',
+  'home.add': 'Add',
+  'home.itemOne': '1 item',
+  'home.itemMany': '{count} items',
+
+  // orders
+  'orders.title': 'My Orders',
+  'orders.loading': 'Loading orders…',
+  'orders.empty': 'No orders yet',
+  'orders.emptyHint': 'Your placed orders will show up here.',
+  'orders.refund': 'Refund {amount}',
+  'orders.payExtra': 'Pay {amount} extra',
+  'orders.refundUpi': 'Refund {amount} to your UPI',
+  'orders.lessCod': 'Pay {amount} less on delivery',
+  'orders.payMoreUpi': 'Pay {amount} more for the added items',
+  'orders.payExtraCod': 'Pay {amount} extra on delivery',
+
+  // profile
+  'profile.title': 'Profile',
+  'profile.buyer': 'Buyer',
+  'profile.noEmail': 'No email',
+  'profile.phone': 'Phone',
+  'profile.phonePlaceholder': 'e.g. 9876543210',
+  'profile.phoneSaved': 'Your phone number has been updated.',
+  'profile.addresses': 'Addresses',
+  'profile.noAddresses': 'No addresses yet',
+  'profile.noAddressesHint': 'Add a delivery address to speed up checkout.',
+  'profile.default': 'Default',
+  'profile.labelOptional': 'Label (optional)',
+  'profile.labelPlaceholder': 'Home, Work…',
+  'profile.door': 'Door / Flat',
+  'profile.street': 'Street',
+  'profile.city': 'City',
+  'profile.pincode': 'Pincode',
+  'profile.landmark': 'Landmark (optional)',
+  'profile.setDefault': 'Set default',
+  'profile.addAddress': 'Add address',
+  'profile.saveAddresses': 'Save addresses',
+  'profile.addressesSaved': 'Your addresses have been updated.',
+  'profile.language': 'Language',
+
+  // product detail
+  'product.title': 'Product',
+  'product.notFound': 'Product not found',
+  'product.notFoundHint': 'This item may no longer be available.',
+
+  // checkout
+  'checkout.unavailableItems': 'Some items are no longer available:',
+  'checkout.removeToPlace': 'Remove them to place your order.',
+  'checkout.yourCart': 'Your cart',
+  'checkout.clearCart': 'Clear cart',
+  'checkout.cartEmpty': 'Cart is empty',
+  'checkout.cartEmptyHint': 'Add some products from the shop first.',
+  'checkout.deliveryAddress': 'Delivery address',
+  'checkout.noAddress': 'Add a delivery address in Profile',
+  'checkout.noAddressHint': 'You need a saved address before you can place an order.',
+  'checkout.selected': 'Selected',
+  'checkout.checkingService': 'Checking serviceability…',
+  'checkout.notServing': 'Currently not serving this location',
+  'checkout.contact': 'Contact',
+  'checkout.contactAt': "We'll contact you at",
+  'checkout.noPhone': 'Add your phone number in Profile to place an order',
+  'checkout.noPhoneHint': 'The shop needs a phone number to reach you about your order.',
+  'checkout.coupons': 'Coupons',
+  'checkout.couponPlaceholder': 'Enter coupon code',
+  'checkout.apply': 'Apply',
+  'checkout.couponInvalid': 'This coupon cannot be applied.',
+  'checkout.couponError': 'Could not apply that coupon. Please try again.',
+  'checkout.couponApplied': 'Coupon {code} applied.',
+  'checkout.totals': 'Totals',
+  'checkout.subtotal': 'Subtotal',
+  'checkout.discount': 'Discount',
+  'checkout.delivery': 'Delivery',
+  'checkout.free': 'FREE',
+  'checkout.grandTotal': 'Grand total',
+  'checkout.note': 'Note',
+  'checkout.noteLabel': 'Add a note for the shop (optional)',
+  'checkout.notePlaceholder': 'e.g. please pack separately',
+  'checkout.phoneVerification': 'Phone verification (optional)',
+  'checkout.phoneVerified': 'Phone verified',
+  'checkout.phonePlaceholder': '10-digit number',
+  'checkout.phoneInvalid': 'Enter a 10-digit phone number.',
+  'profile.phoneInvalidTitle': 'Invalid phone',
+  'checkout.sendOtp': 'Send OTP',
+  'checkout.enterCode': 'Enter code',
+  'checkout.codePlaceholder': '6-digit code',
+  'checkout.verify': 'Verify',
+  'checkout.placeOrder': 'Place order',
+  'checkout.codeSent': 'Code sent',
+  'checkout.codeSentHint': 'Enter the code you received to verify your phone.',
+  'checkout.smsNotConfigured': 'SMS not configured yet',
+  'checkout.smsUnavailable':
+    'Phone verification is unavailable right now. You can still place your order.',
+  'checkout.phoneVerifiedHint': 'Thanks — your phone number is verified.',
+  'checkout.verifyFailed': 'Verification failed',
+  'checkout.verifyFailedHint': 'That code is invalid or has expired.',
+  'checkout.orderPlaced': 'Order placed',
+  'checkout.orderPlacedHint': 'Your order has been sent to the shop.',
+  'checkout.orderFailed': 'Could not place order',
+
+  // payment
+  'pay.method': 'Payment method',
+  'pay.cod': 'Cash on delivery',
+  'pay.upi': 'UPI',
+  'pay.upiNotSetup': 'UPI not set up by the shop yet',
+  'pay.complete': 'Complete payment',
+  'pay.payTo': 'Pay {amount} to {payee}',
+  'pay.openUpi': 'Open UPI app',
+  'pay.openUpiPay': 'Open UPI app to pay',
+  'pay.upiPlacedHint': 'Complete the payment in your UPI app. The shop will confirm it before preparing your order.',
+  'pay.noUpiAppTitle': 'No UPI app found',
+  'pay.ref': 'UPI reference (optional)',
+  'pay.refPlaceholder': 'e.g. transaction / UTR number',
+  'pay.paid': "I've paid",
+  'pay.later': 'Pay later',
+  'pay.noUpiApp': 'No UPI app found — pay to {vpa} manually',
+  'pay.paidTitle': 'Payment noted',
+  'pay.paidHint': "We've let the shop know. They'll confirm it shortly.",
+};
+
+// --- Tamil (machine translation, pending native review) ---
+const ta: Record<string, string> = {
+  'common.save': 'சேமி',
+  'common.saved': 'சேமிக்கப்பட்டது ✓',
+  'common.couldNotSave': 'சேமிக்க முடியவில்லை',
+  'common.tryAgain': 'மீண்டும் முயற்சிக்கவும்.',
+  'common.delete': 'நீக்கு',
+  'common.remove': 'அகற்று',
+  'common.addToCart': 'கூடையில் சேர்',
+  'common.checkout': 'பணம் செலுத்து',
+  'common.outOfStock': 'கையிருப்பில் இல்லை',
+  'common.unavailable': 'கிடைக்கவில்லை',
+  'common.shopClosed': 'கடை இப்போது ஆர்டர்களை ஏற்கவில்லை.',
+  'common.phoneNumber': 'தொலைபேசி எண்',
+
+  'tabs.shop': 'கடை',
+  'tabs.orders': 'ஆர்டர்கள்',
+  'tabs.profile': 'சுயவிவரம்',
+
+  'signin.brand': 'கடை',
+  'signin.buyer': 'வாங்குபவர்',
+  'signin.setupRequired': 'அமைப்பு தேவை',
+  'signin.setupHint':
+    '{path} இல் உள்ள REPLACE_ME மதிப்புகளை உங்கள் Firebase கட்டமைப்பு மற்றும் Google web client ID உடன் மாற்றி, மீண்டும் ஏற்றவும். README ஐப் பார்க்கவும்.',
+  'signin.google': 'Google மூலம் உள்நுழைக',
+  'signin.subtitle': 'கடையை உலாவவும் ஆர்டர்களை வைக்கவும் உள்நுழையவும்.',
+  'signin.failed': 'உள்நுழைவு தோல்வியடைந்தது',
+
+  'home.closed': 'இப்போது ஆர்டர்களை ஏற்கவில்லை — விரைவில் திரும்புவோம்!',
+  'home.loading': 'தயாரிப்புகள் ஏற்றப்படுகின்றன…',
+  'home.featured': 'சிறப்பு',
+  'home.categories': 'வகைகள்',
+  'home.all': 'அனைத்தும்',
+  'home.products': 'தயாரிப்புகள்',
+  'home.search': 'தயாரிப்புகளைத் தேடு',
+  'home.noProducts': 'தயாரிப்புகள் இல்லை',
+  'home.noMatch': '"{q}" உடன் பொருந்தும் தயாரிப்புகள் இல்லை',
+  'home.noneInCategory': 'இந்த வகையில் இன்னும் எதுவும் இல்லை.',
+  'home.add': 'சேர்',
+  'home.itemOne': '1 பொருள்',
+  'home.itemMany': '{count} பொருட்கள்',
+
+  'orders.title': 'எனது ஆர்டர்கள்',
+  'orders.loading': 'ஆர்டர்கள் ஏற்றப்படுகின்றன…',
+  'orders.empty': 'இன்னும் ஆர்டர்கள் இல்லை',
+  'orders.emptyHint': 'நீங்கள் வைத்த ஆர்டர்கள் இங்கே காட்டப்படும்.',
+  'orders.refund': 'பணத்திரும்பம் {amount}',
+  'orders.payExtra': 'கூடுதலாக {amount} செலுத்தவும்',
+  'orders.refundUpi': 'உங்கள் UPIக்கு {amount} திரும்பப் பெறப்படும்',
+  'orders.lessCod': 'டெலிவரியின்போது {amount} குறைவாகச் செலுத்தவும்',
+  'orders.payMoreUpi': 'சேர்க்கப்பட்ட பொருட்களுக்கு {amount} கூடுதலாகச் செலுத்தவும்',
+  'orders.payExtraCod': 'டெலிவரியின்போது கூடுதலாக {amount} செலுத்தவும்',
+
+  'profile.title': 'சுயவிவரம்',
+  'profile.buyer': 'வாங்குபவர்',
+  'profile.noEmail': 'மின்னஞ்சல் இல்லை',
+  'profile.phone': 'தொலைபேசி',
+  'profile.phonePlaceholder': 'உதா. 9876543210',
+  'profile.phoneSaved': 'உங்கள் தொலைபேசி எண் புதுப்பிக்கப்பட்டது.',
+  'profile.addresses': 'முகவரிகள்',
+  'profile.noAddresses': 'இன்னும் முகவரிகள் இல்லை',
+  'profile.noAddressesHint': 'பணம் செலுத்துவதை விரைவுபடுத்த ஒரு டெலிவரி முகவரியைச் சேர்க்கவும்.',
+  'profile.default': 'இயல்புநிலை',
+  'profile.labelOptional': 'லேபிள் (விருப்பம்)',
+  'profile.labelPlaceholder': 'வீடு, அலுவலகம்…',
+  'profile.door': 'கதவு / பிளாட்',
+  'profile.street': 'தெரு',
+  'profile.city': 'நகரம்',
+  'profile.pincode': 'பின்கோடு',
+  'profile.landmark': 'அடையாளம் (விருப்பம்)',
+  'profile.setDefault': 'இயல்புநிலையாக அமை',
+  'profile.addAddress': 'முகவரியைச் சேர்',
+  'profile.saveAddresses': 'முகவரிகளைச் சேமி',
+  'profile.addressesSaved': 'உங்கள் முகவரிகள் புதுப்பிக்கப்பட்டன.',
+  'profile.language': 'மொழி',
+
+  'product.title': 'தயாரிப்பு',
+  'product.notFound': 'தயாரிப்பு கிடைக்கவில்லை',
+  'product.notFoundHint': 'இந்த பொருள் இனி கிடைக்காமல் இருக்கலாம்.',
+
+  'checkout.unavailableItems': 'சில பொருட்கள் இனி கிடைக்கவில்லை:',
+  'checkout.removeToPlace': 'உங்கள் ஆர்டரை வைக்க அவற்றை அகற்றவும்.',
+  'checkout.yourCart': 'உங்கள் கூடை',
+  'checkout.clearCart': 'கூடையை அழி',
+  'checkout.cartEmpty': 'கூடை காலியாக உள்ளது',
+  'checkout.cartEmptyHint': 'முதலில் கடையிலிருந்து சில தயாரிப்புகளைச் சேர்க்கவும்.',
+  'checkout.deliveryAddress': 'டெலிவரி முகவரி',
+  'checkout.noAddress': 'சுயவிவரத்தில் ஒரு டெலிவரி முகவரியைச் சேர்க்கவும்',
+  'checkout.noAddressHint': 'ஆர்டர் வைப்பதற்கு முன் சேமிக்கப்பட்ட முகவரி தேவை.',
+  'checkout.selected': 'தேர்ந்தெடுக்கப்பட்டது',
+  'checkout.checkingService': 'சேவை கிடைப்பதைச் சரிபார்க்கிறது…',
+  'checkout.notServing': 'தற்போது இந்த இடத்திற்கு சேவை இல்லை',
+  'checkout.contact': 'தொடர்பு',
+  'checkout.contactAt': 'இந்த எண்ணில் உங்களைத் தொடர்புகொள்வோம்',
+  'checkout.noPhone': 'ஆர்டர் வைக்க சுயவிவரத்தில் உங்கள் தொலைபேசி எண்ணைச் சேர்க்கவும்',
+  'checkout.noPhoneHint': 'உங்கள் ஆர்டர் குறித்து தொடர்புகொள்ள கடைக்கு தொலைபேசி எண் தேவை.',
+  'checkout.coupons': 'கூப்பன்கள்',
+  'checkout.couponPlaceholder': 'கூப்பன் குறியீட்டை உள்ளிடவும்',
+  'checkout.apply': 'பயன்படுத்து',
+  'checkout.couponInvalid': 'இந்த கூப்பனைப் பயன்படுத்த முடியாது.',
+  'checkout.couponError': 'அந்த கூப்பனைப் பயன்படுத்த முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
+  'checkout.couponApplied': 'கூப்பன் {code} பயன்படுத்தப்பட்டது.',
+  'checkout.totals': 'மொத்தங்கள்',
+  'checkout.subtotal': 'துணை மொத்தம்',
+  'checkout.discount': 'தள்ளுபடி',
+  'checkout.delivery': 'டெலிவரி',
+  'checkout.free': 'இலவசம்',
+  'checkout.grandTotal': 'மொத்தத் தொகை',
+  'checkout.note': 'குறிப்பு',
+  'checkout.noteLabel': 'கடைக்கு ஒரு குறிப்பைச் சேர்க்கவும் (விருப்பம்)',
+  'checkout.notePlaceholder': 'உதா. தனித்தனியாக பேக் செய்யவும்',
+  'checkout.phoneVerification': 'தொலைபேசி சரிபார்ப்பு (விருப்பம்)',
+  'checkout.phoneVerified': 'தொலைபேசி சரிபார்க்கப்பட்டது',
+  'checkout.phonePlaceholder': '10 இலக்க எண்',
+  'checkout.phoneInvalid': '10 இலக்க தொலைபேசி எண்ணை உள்ளிடவும்.',
+  'profile.phoneInvalidTitle': 'தவறான தொலைபேசி',
+  'checkout.sendOtp': 'OTP அனுப்பு',
+  'checkout.enterCode': 'குறியீட்டை உள்ளிடவும்',
+  'checkout.codePlaceholder': '6 இலக்க குறியீடு',
+  'checkout.verify': 'சரிபார்',
+  'checkout.placeOrder': 'ஆர்டர் செய்',
+  'checkout.codeSent': 'குறியீடு அனுப்பப்பட்டது',
+  'checkout.codeSentHint': 'உங்கள் தொலைபேசியைச் சரிபார்க்க நீங்கள் பெற்ற குறியீட்டை உள்ளிடவும்.',
+  'checkout.smsNotConfigured': 'SMS இன்னும் கட்டமைக்கப்படவில்லை',
+  'checkout.smsUnavailable':
+    'தொலைபேசி சரிபார்ப்பு இப்போது கிடைக்கவில்லை. நீங்கள் இன்னும் ஆர்டர் செய்யலாம்.',
+  'checkout.phoneVerifiedHint': 'நன்றி — உங்கள் தொலைபேசி எண் சரிபார்க்கப்பட்டது.',
+  'checkout.verifyFailed': 'சரிபார்ப்பு தோல்வியடைந்தது',
+  'checkout.verifyFailedHint': 'அந்த குறியீடு தவறானது அல்லது காலாவதியானது.',
+  'checkout.orderPlaced': 'ஆர்டர் வைக்கப்பட்டது',
+  'checkout.orderPlacedHint': 'உங்கள் ஆர்டர் கடைக்கு அனுப்பப்பட்டது.',
+  'checkout.orderFailed': 'ஆர்டர் செய்ய முடியவில்லை',
+
+  'pay.method': 'பணம் செலுத்தும் முறை',
+  'pay.cod': 'டெலிவரியின்போது பணம்',
+  'pay.upi': 'UPI',
+  'pay.upiNotSetup': 'கடை இன்னும் UPI அமைக்கவில்லை',
+  'pay.complete': 'பணம் செலுத்துதலை முடிக்கவும்',
+  'pay.payTo': '{payee} க்கு {amount} செலுத்துங்கள்',
+  'pay.openUpi': 'UPI பயன்பாட்டைத் திற',
+  'pay.openUpiPay': 'பணம் செலுத்த UPI பயன்பாட்டைத் திற',
+  'pay.upiPlacedHint': 'உங்கள் UPI பயன்பாட்டில் பணம் செலுத்தவும். கடை அதை உறுதிப்படுத்திய பிறகு உங்கள் ஆர்டரைத் தயாரிக்கும்.',
+  'pay.noUpiAppTitle': 'UPI பயன்பாடு இல்லை',
+  'pay.ref': 'UPI குறிப்பு (விருப்பம்)',
+  'pay.refPlaceholder': 'உதா. பரிவர்த்தனை / UTR எண்',
+  'pay.paid': 'நான் செலுத்திவிட்டேன்',
+  'pay.later': 'பின்னர் செலுத்து',
+  'pay.noUpiApp': 'UPI பயன்பாடு இல்லை — {vpa} க்கு நேரடியாக செலுத்துங்கள்',
+  'pay.paidTitle': 'பணம் பதிவு செய்யப்பட்டது',
+  'pay.paidHint': 'கடைக்குத் தெரிவித்துவிட்டோம். விரைவில் உறுதிப்படுத்துவார்கள்.',
+};
+
+// --- Hindi (machine translation, pending native review) ---
+const hi: Record<string, string> = {
+  'common.save': 'सहेजें',
+  'common.saved': 'सहेजा गया ✓',
+  'common.couldNotSave': 'सहेजा नहीं जा सका',
+  'common.tryAgain': 'कृपया पुनः प्रयास करें।',
+  'common.delete': 'हटाएं',
+  'common.remove': 'निकालें',
+  'common.addToCart': 'कार्ट में जोड़ें',
+  'common.checkout': 'चेकआउट',
+  'common.outOfStock': 'स्टॉक में नहीं',
+  'common.unavailable': 'अनुपलब्ध',
+  'common.shopClosed': 'दुकान अभी ऑर्डर स्वीकार नहीं कर रही है।',
+  'common.phoneNumber': 'फ़ोन नंबर',
+
+  'tabs.shop': 'दुकान',
+  'tabs.orders': 'ऑर्डर',
+  'tabs.profile': 'प्रोफ़ाइल',
+
+  'signin.brand': 'दुकान',
+  'signin.buyer': 'खरीदार',
+  'signin.setupRequired': 'सेटअप आवश्यक',
+  'signin.setupHint':
+    '{path} में REPLACE_ME मानों को अपने Firebase कॉन्फ़िग और Google web client ID से बदलें, फिर पुनः लोड करें। README देखें।',
+  'signin.google': 'Google से साइन इन करें',
+  'signin.subtitle': 'दुकान ब्राउज़ करने और ऑर्डर देने के लिए साइन इन करें।',
+  'signin.failed': 'साइन-इन विफल',
+
+  'home.closed': 'अभी ऑर्डर स्वीकार नहीं कर रहे — जल्द वापस आएंगे!',
+  'home.loading': 'उत्पाद लोड हो रहे हैं…',
+  'home.featured': 'विशेष',
+  'home.categories': 'श्रेणियाँ',
+  'home.all': 'सभी',
+  'home.products': 'उत्पाद',
+  'home.search': 'उत्पाद खोजें',
+  'home.noProducts': 'कोई उत्पाद नहीं',
+  'home.noMatch': '"{q}" से मेल खाने वाला कोई उत्पाद नहीं',
+  'home.noneInCategory': 'इस श्रेणी में अभी कुछ उपलब्ध नहीं है।',
+  'home.add': 'जोड़ें',
+  'home.itemOne': '1 वस्तु',
+  'home.itemMany': '{count} वस्तुएँ',
+
+  'orders.title': 'मेरे ऑर्डर',
+  'orders.loading': 'ऑर्डर लोड हो रहे हैं…',
+  'orders.empty': 'अभी तक कोई ऑर्डर नहीं',
+  'orders.emptyHint': 'आपके दिए गए ऑर्डर यहाँ दिखाई देंगे।',
+  'orders.refund': 'वापसी {amount}',
+  'orders.payExtra': '{amount} अतिरिक्त भुगतान करें',
+  'orders.refundUpi': 'आपके UPI में {amount} वापस किया जाएगा',
+  'orders.lessCod': 'डिलीवरी पर {amount} कम भुगतान करें',
+  'orders.payMoreUpi': 'जोड़ी गई वस्तुओं के लिए {amount} और भुगतान करें',
+  'orders.payExtraCod': 'डिलीवरी पर {amount} अतिरिक्त भुगतान करें',
+
+  'profile.title': 'प्रोफ़ाइल',
+  'profile.buyer': 'खरीदार',
+  'profile.noEmail': 'कोई ईमेल नहीं',
+  'profile.phone': 'फ़ोन',
+  'profile.phonePlaceholder': 'जैसे 9876543210',
+  'profile.phoneSaved': 'आपका फ़ोन नंबर अपडेट कर दिया गया है।',
+  'profile.addresses': 'पते',
+  'profile.noAddresses': 'अभी तक कोई पता नहीं',
+  'profile.noAddressesHint': 'चेकआउट तेज़ करने के लिए एक डिलीवरी पता जोड़ें।',
+  'profile.default': 'डिफ़ॉल्ट',
+  'profile.labelOptional': 'लेबल (वैकल्पिक)',
+  'profile.labelPlaceholder': 'घर, कार्यालय…',
+  'profile.door': 'दरवाज़ा / फ्लैट',
+  'profile.street': 'गली',
+  'profile.city': 'शहर',
+  'profile.pincode': 'पिनकोड',
+  'profile.landmark': 'लैंडमार्क (वैकल्पिक)',
+  'profile.setDefault': 'डिफ़ॉल्ट सेट करें',
+  'profile.addAddress': 'पता जोड़ें',
+  'profile.saveAddresses': 'पते सहेजें',
+  'profile.addressesSaved': 'आपके पते अपडेट कर दिए गए हैं।',
+  'profile.language': 'भाषा',
+
+  'product.title': 'उत्पाद',
+  'product.notFound': 'उत्पाद नहीं मिला',
+  'product.notFoundHint': 'यह वस्तु अब उपलब्ध नहीं हो सकती।',
+
+  'checkout.unavailableItems': 'कुछ वस्तुएँ अब उपलब्ध नहीं हैं:',
+  'checkout.removeToPlace': 'अपना ऑर्डर देने के लिए उन्हें हटाएं।',
+  'checkout.yourCart': 'आपका कार्ट',
+  'checkout.clearCart': 'कार्ट खाली करें',
+  'checkout.cartEmpty': 'कार्ट खाली है',
+  'checkout.cartEmptyHint': 'पहले दुकान से कुछ उत्पाद जोड़ें।',
+  'checkout.deliveryAddress': 'डिलीवरी पता',
+  'checkout.noAddress': 'प्रोफ़ाइल में एक डिलीवरी पता जोड़ें',
+  'checkout.noAddressHint': 'ऑर्डर देने से पहले आपको एक सहेजा गया पता चाहिए।',
+  'checkout.selected': 'चयनित',
+  'checkout.checkingService': 'सेवा उपलब्धता जाँच रहे हैं…',
+  'checkout.notServing': 'फ़िलहाल इस स्थान पर सेवा नहीं है',
+  'checkout.contact': 'संपर्क',
+  'checkout.contactAt': 'हम आपसे इस पर संपर्क करेंगे',
+  'checkout.noPhone': 'ऑर्डर देने के लिए प्रोफ़ाइल में अपना फ़ोन नंबर जोड़ें',
+  'checkout.noPhoneHint': 'दुकान को आपके ऑर्डर के बारे में संपर्क करने के लिए फ़ोन नंबर चाहिए।',
+  'checkout.coupons': 'कूपन',
+  'checkout.couponPlaceholder': 'कूपन कोड दर्ज करें',
+  'checkout.apply': 'लागू करें',
+  'checkout.couponInvalid': 'यह कूपन लागू नहीं किया जा सकता।',
+  'checkout.couponError': 'वह कूपन लागू नहीं हो सका। कृपया पुनः प्रयास करें।',
+  'checkout.couponApplied': 'कूपन {code} लागू किया गया।',
+  'checkout.totals': 'कुल योग',
+  'checkout.subtotal': 'उप-योग',
+  'checkout.discount': 'छूट',
+  'checkout.delivery': 'डिलीवरी',
+  'checkout.free': 'मुफ़्त',
+  'checkout.grandTotal': 'कुल राशि',
+  'checkout.note': 'नोट',
+  'checkout.noteLabel': 'दुकान के लिए एक नोट जोड़ें (वैकल्पिक)',
+  'checkout.notePlaceholder': 'जैसे कृपया अलग-अलग पैक करें',
+  'checkout.phoneVerification': 'फ़ोन सत्यापन (वैकल्पिक)',
+  'checkout.phoneVerified': 'फ़ोन सत्यापित',
+  'checkout.phonePlaceholder': '10 अंकों का नंबर',
+  'checkout.phoneInvalid': '10 अंकों का फ़ोन नंबर दर्ज करें।',
+  'profile.phoneInvalidTitle': 'अमान्य फ़ोन',
+  'checkout.sendOtp': 'OTP भेजें',
+  'checkout.enterCode': 'कोड दर्ज करें',
+  'checkout.codePlaceholder': '6 अंकों का कोड',
+  'checkout.verify': 'सत्यापित करें',
+  'checkout.placeOrder': 'ऑर्डर दें',
+  'checkout.codeSent': 'कोड भेजा गया',
+  'checkout.codeSentHint': 'अपना फ़ोन सत्यापित करने के लिए प्राप्त कोड दर्ज करें।',
+  'checkout.smsNotConfigured': 'SMS अभी कॉन्फ़िगर नहीं है',
+  'checkout.smsUnavailable':
+    'फ़ोन सत्यापन अभी उपलब्ध नहीं है। आप फिर भी अपना ऑर्डर दे सकते हैं।',
+  'checkout.phoneVerifiedHint': 'धन्यवाद — आपका फ़ोन नंबर सत्यापित हो गया है।',
+  'checkout.verifyFailed': 'सत्यापन विफल',
+  'checkout.verifyFailedHint': 'वह कोड अमान्य है या समाप्त हो गया है।',
+  'checkout.orderPlaced': 'ऑर्डर दिया गया',
+  'checkout.orderPlacedHint': 'आपका ऑर्डर दुकान को भेज दिया गया है।',
+  'checkout.orderFailed': 'ऑर्डर नहीं दिया जा सका',
+
+  'pay.method': 'भुगतान का तरीका',
+  'pay.cod': 'डिलीवरी पर नकद',
+  'pay.upi': 'UPI',
+  'pay.upiNotSetup': 'दुकान ने अभी UPI सेटअप नहीं किया है',
+  'pay.complete': 'भुगतान पूरा करें',
+  'pay.payTo': '{payee} को {amount} का भुगतान करें',
+  'pay.openUpi': 'UPI ऐप खोलें',
+  'pay.openUpiPay': 'भुगतान के लिए UPI ऐप खोलें',
+  'pay.upiPlacedHint': 'अपने UPI ऐप में भुगतान पूरा करें। दुकान इसकी पुष्टि के बाद आपका ऑर्डर तैयार करेगी।',
+  'pay.noUpiAppTitle': 'कोई UPI ऐप नहीं मिला',
+  'pay.ref': 'UPI संदर्भ (वैकल्पिक)',
+  'pay.refPlaceholder': 'जैसे लेनदेन / UTR नंबर',
+  'pay.paid': 'मैंने भुगतान कर दिया',
+  'pay.later': 'बाद में भुगतान करें',
+  'pay.noUpiApp': 'कोई UPI ऐप नहीं मिला — {vpa} को सीधे भुगतान करें',
+  'pay.paidTitle': 'भुगतान दर्ज किया गया',
+  'pay.paidHint': 'हमने दुकान को सूचित कर दिया है। वे जल्द ही पुष्टि करेंगे।',
+};
+
+// --- Kannada (machine translation, pending native review) ---
+const kn: Record<string, string> = {
+  'common.save': 'ಉಳಿಸಿ',
+  'common.saved': 'ಉಳಿಸಲಾಗಿದೆ ✓',
+  'common.couldNotSave': 'ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ',
+  'common.tryAgain': 'ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+  'common.delete': 'ಅಳಿಸಿ',
+  'common.remove': 'ತೆಗೆದುಹಾಕಿ',
+  'common.addToCart': 'ಕಾರ್ಟ್‌ಗೆ ಸೇರಿಸಿ',
+  'common.checkout': 'ಚೆಕ್‌ಔಟ್',
+  'common.outOfStock': 'ದಾಸ್ತಾನಿನಲ್ಲಿ ಇಲ್ಲ',
+  'common.unavailable': 'ಲಭ್ಯವಿಲ್ಲ',
+  'common.shopClosed': 'ಅಂಗಡಿ ಇದೀಗ ಆರ್ಡರ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸುತ್ತಿಲ್ಲ.',
+  'common.phoneNumber': 'ದೂರವಾಣಿ ಸಂಖ್ಯೆ',
+
+  'tabs.shop': 'ಅಂಗಡಿ',
+  'tabs.orders': 'ಆರ್ಡರ್‌ಗಳು',
+  'tabs.profile': 'ಪ್ರೊಫೈಲ್',
+
+  'signin.brand': 'ಅಂಗಡಿ',
+  'signin.buyer': 'ಖರೀದಿದಾರ',
+  'signin.setupRequired': 'ಸೆಟಪ್ ಅಗತ್ಯವಿದೆ',
+  'signin.setupHint':
+    '{path} ನಲ್ಲಿರುವ REPLACE_ME ಮೌಲ್ಯಗಳನ್ನು ನಿಮ್ಮ Firebase ಕಾನ್ಫಿಗ್ ಮತ್ತು Google web client ID ನೊಂದಿಗೆ ಬದಲಾಯಿಸಿ, ನಂತರ ಮರುಲೋಡ್ ಮಾಡಿ. README ನೋಡಿ.',
+  'signin.google': 'Google ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಿ',
+  'signin.subtitle': 'ಅಂಗಡಿಯನ್ನು ವೀಕ್ಷಿಸಲು ಮತ್ತು ಆರ್ಡರ್ ಮಾಡಲು ಸೈನ್ ಇನ್ ಮಾಡಿ.',
+  'signin.failed': 'ಸೈನ್-ಇನ್ ವಿಫಲವಾಗಿದೆ',
+
+  'home.closed': 'ಇದೀಗ ಆರ್ಡರ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸುತ್ತಿಲ್ಲ — ಶೀಘ್ರದಲ್ಲೇ ಹಿಂತಿರುಗುತ್ತೇವೆ!',
+  'home.loading': 'ಉತ್ಪನ್ನಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ…',
+  'home.featured': 'ವೈಶಿಷ್ಟ್ಯ',
+  'home.categories': 'ವರ್ಗಗಳು',
+  'home.all': 'ಎಲ್ಲಾ',
+  'home.products': 'ಉತ್ಪನ್ನಗಳು',
+  'home.search': 'ಉತ್ಪನ್ನಗಳನ್ನು ಹುಡುಕಿ',
+  'home.noProducts': 'ಯಾವುದೇ ಉತ್ಪನ್ನಗಳಿಲ್ಲ',
+  'home.noMatch': '"{q}" ಗೆ ಹೊಂದುವ ಉತ್ಪನ್ನಗಳಿಲ್ಲ',
+  'home.noneInCategory': 'ಈ ವರ್ಗದಲ್ಲಿ ಇನ್ನೂ ಏನೂ ಲಭ್ಯವಿಲ್ಲ.',
+  'home.add': 'ಸೇರಿಸಿ',
+  'home.itemOne': '1 ವಸ್ತು',
+  'home.itemMany': '{count} ವಸ್ತುಗಳು',
+
+  'orders.title': 'ನನ್ನ ಆರ್ಡರ್‌ಗಳು',
+  'orders.loading': 'ಆರ್ಡರ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ…',
+  'orders.empty': 'ಇನ್ನೂ ಆರ್ಡರ್‌ಗಳಿಲ್ಲ',
+  'orders.emptyHint': 'ನೀವು ಮಾಡಿದ ಆರ್ಡರ್‌ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.',
+  'orders.refund': 'ಮರುಪಾವತಿ {amount}',
+  'orders.payExtra': '{amount} ಹೆಚ್ಚುವರಿ ಪಾವತಿಸಿ',
+  'orders.refundUpi': 'ನಿಮ್ಮ UPIಗೆ {amount} ಮರುಪಾವತಿ ಮಾಡಲಾಗುವುದು',
+  'orders.lessCod': 'ಡೆಲಿವರಿ ಸಮಯದಲ್ಲಿ {amount} ಕಡಿಮೆ ಪಾವತಿಸಿ',
+  'orders.payMoreUpi': 'ಸೇರಿಸಿದ ವಸ್ತುಗಳಿಗೆ {amount} ಹೆಚ್ಚು ಪಾವತಿಸಿ',
+  'orders.payExtraCod': 'ಡೆಲಿವರಿ ಸಮಯದಲ್ಲಿ {amount} ಹೆಚ್ಚುವರಿ ಪಾವತಿಸಿ',
+
+  'profile.title': 'ಪ್ರೊಫೈಲ್',
+  'profile.buyer': 'ಖರೀದಿದಾರ',
+  'profile.noEmail': 'ಇಮೇಲ್ ಇಲ್ಲ',
+  'profile.phone': 'ದೂರವಾಣಿ',
+  'profile.phonePlaceholder': 'ಉದಾ. 9876543210',
+  'profile.phoneSaved': 'ನಿಮ್ಮ ದೂರವಾಣಿ ಸಂಖ್ಯೆ ನವೀಕರಿಸಲಾಗಿದೆ.',
+  'profile.addresses': 'ವಿಳಾಸಗಳು',
+  'profile.noAddresses': 'ಇನ್ನೂ ವಿಳಾಸಗಳಿಲ್ಲ',
+  'profile.noAddressesHint': 'ಚೆಕ್‌ಔಟ್ ವೇಗಗೊಳಿಸಲು ಡೆಲಿವರಿ ವಿಳಾಸವನ್ನು ಸೇರಿಸಿ.',
+  'profile.default': 'ಡೀಫಾಲ್ಟ್',
+  'profile.labelOptional': 'ಲೇಬಲ್ (ಐಚ್ಛಿಕ)',
+  'profile.labelPlaceholder': 'ಮನೆ, ಕಚೇರಿ…',
+  'profile.door': 'ಬಾಗಿಲು / ಫ್ಲಾಟ್',
+  'profile.street': 'ರಸ್ತೆ',
+  'profile.city': 'ನಗರ',
+  'profile.pincode': 'ಪಿನ್‌ಕೋಡ್',
+  'profile.landmark': 'ಗುರುತು (ಐಚ್ಛಿಕ)',
+  'profile.setDefault': 'ಡೀಫಾಲ್ಟ್ ಆಗಿ ಹೊಂದಿಸಿ',
+  'profile.addAddress': 'ವಿಳಾಸ ಸೇರಿಸಿ',
+  'profile.saveAddresses': 'ವಿಳಾಸಗಳನ್ನು ಉಳಿಸಿ',
+  'profile.addressesSaved': 'ನಿಮ್ಮ ವಿಳಾಸಗಳನ್ನು ನವೀಕರಿಸಲಾಗಿದೆ.',
+  'profile.language': 'ಭಾಷೆ',
+
+  'product.title': 'ಉತ್ಪನ್ನ',
+  'product.notFound': 'ಉತ್ಪನ್ನ ಕಂಡುಬಂದಿಲ್ಲ',
+  'product.notFoundHint': 'ಈ ವಸ್ತು ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲದಿರಬಹುದು.',
+
+  'checkout.unavailableItems': 'ಕೆಲವು ವಸ್ತುಗಳು ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲ:',
+  'checkout.removeToPlace': 'ನಿಮ್ಮ ಆರ್ಡರ್ ಮಾಡಲು ಅವುಗಳನ್ನು ತೆಗೆದುಹಾಕಿ.',
+  'checkout.yourCart': 'ನಿಮ್ಮ ಕಾರ್ಟ್',
+  'checkout.clearCart': 'ಕಾರ್ಟ್ ತೆರವುಗೊಳಿಸಿ',
+  'checkout.cartEmpty': 'ಕಾರ್ಟ್ ಖಾಲಿಯಾಗಿದೆ',
+  'checkout.cartEmptyHint': 'ಮೊದಲು ಅಂಗಡಿಯಿಂದ ಕೆಲವು ಉತ್ಪನ್ನಗಳನ್ನು ಸೇರಿಸಿ.',
+  'checkout.deliveryAddress': 'ಡೆಲಿವರಿ ವಿಳಾಸ',
+  'checkout.noAddress': 'ಪ್ರೊಫೈಲ್‌ನಲ್ಲಿ ಡೆಲಿವರಿ ವಿಳಾಸವನ್ನು ಸೇರಿಸಿ',
+  'checkout.noAddressHint': 'ಆರ್ಡರ್ ಮಾಡುವ ಮೊದಲು ನಿಮಗೆ ಉಳಿಸಿದ ವಿಳಾಸ ಬೇಕು.',
+  'checkout.selected': 'ಆಯ್ಕೆಮಾಡಲಾಗಿದೆ',
+  'checkout.checkingService': 'ಸೇವೆ ಲಭ್ಯತೆ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…',
+  'checkout.notServing': 'ಪ್ರಸ್ತುತ ಈ ಸ್ಥಳಕ್ಕೆ ಸೇವೆ ಇಲ್ಲ',
+  'checkout.contact': 'ಸಂಪರ್ಕ',
+  'checkout.contactAt': 'ನಾವು ನಿಮ್ಮನ್ನು ಇಲ್ಲಿ ಸಂಪರ್ಕಿಸುತ್ತೇವೆ',
+  'checkout.noPhone': 'ಆರ್ಡರ್ ಮಾಡಲು ಪ್ರೊಫೈಲ್‌ನಲ್ಲಿ ನಿಮ್ಮ ದೂರವಾಣಿ ಸಂಖ್ಯೆ ಸೇರಿಸಿ',
+  'checkout.noPhoneHint': 'ನಿಮ್ಮ ಆರ್ಡರ್ ಬಗ್ಗೆ ನಿಮ್ಮನ್ನು ತಲುಪಲು ಅಂಗಡಿಗೆ ದೂರವಾಣಿ ಸಂಖ್ಯೆ ಬೇಕು.',
+  'checkout.coupons': 'ಕೂಪನ್‌ಗಳು',
+  'checkout.couponPlaceholder': 'ಕೂಪನ್ ಕೋಡ್ ನಮೂದಿಸಿ',
+  'checkout.apply': 'ಅನ್ವಯಿಸಿ',
+  'checkout.couponInvalid': 'ಈ ಕೂಪನ್ ಅನ್ವಯಿಸಲಾಗುವುದಿಲ್ಲ.',
+  'checkout.couponError': 'ಆ ಕೂಪನ್ ಅನ್ವಯಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+  'checkout.couponApplied': 'ಕೂಪನ್ {code} ಅನ್ವಯಿಸಲಾಗಿದೆ.',
+  'checkout.totals': 'ಒಟ್ಟು',
+  'checkout.subtotal': 'ಉಪಮೊತ್ತ',
+  'checkout.discount': 'ರಿಯಾಯಿತಿ',
+  'checkout.delivery': 'ಡೆಲಿವರಿ',
+  'checkout.free': 'ಉಚಿತ',
+  'checkout.grandTotal': 'ಒಟ್ಟು ಮೊತ್ತ',
+  'checkout.note': 'ಟಿಪ್ಪಣಿ',
+  'checkout.noteLabel': 'ಅಂಗಡಿಗೆ ಟಿಪ್ಪಣಿ ಸೇರಿಸಿ (ಐಚ್ಛಿಕ)',
+  'checkout.notePlaceholder': 'ಉದಾ. ದಯವಿಟ್ಟು ಪ್ರತ್ಯೇಕವಾಗಿ ಪ್ಯಾಕ್ ಮಾಡಿ',
+  'checkout.phoneVerification': 'ದೂರವಾಣಿ ಪರಿಶೀಲನೆ (ಐಚ್ಛಿಕ)',
+  'checkout.phoneVerified': 'ದೂರವಾಣಿ ಪರಿಶೀಲಿಸಲಾಗಿದೆ',
+  'checkout.phonePlaceholder': '10 ಅಂಕಿಯ ಸಂಖ್ಯೆ',
+  'checkout.phoneInvalid': '10 ಅಂಕಿಯ ದೂರವಾಣಿ ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ.',
+  'profile.phoneInvalidTitle': 'ಅಮಾನ್ಯ ದೂರವಾಣಿ',
+  'checkout.sendOtp': 'OTP ಕಳುಹಿಸಿ',
+  'checkout.enterCode': 'ಕೋಡ್ ನಮೂದಿಸಿ',
+  'checkout.codePlaceholder': '6 ಅಂಕಿಯ ಕೋಡ್',
+  'checkout.verify': 'ಪರಿಶೀಲಿಸಿ',
+  'checkout.placeOrder': 'ಆರ್ಡರ್ ಮಾಡಿ',
+  'checkout.codeSent': 'ಕೋಡ್ ಕಳುಹಿಸಲಾಗಿದೆ',
+  'checkout.codeSentHint': 'ನಿಮ್ಮ ದೂರವಾಣಿ ಪರಿಶೀಲಿಸಲು ನೀವು ಪಡೆದ ಕೋಡ್ ನಮೂದಿಸಿ.',
+  'checkout.smsNotConfigured': 'SMS ಇನ್ನೂ ಕಾನ್ಫಿಗರ್ ಆಗಿಲ್ಲ',
+  'checkout.smsUnavailable':
+    'ದೂರವಾಣಿ ಪರಿಶೀಲನೆ ಇದೀಗ ಲಭ್ಯವಿಲ್ಲ. ನೀವು ಇನ್ನೂ ಆರ್ಡರ್ ಮಾಡಬಹುದು.',
+  'checkout.phoneVerifiedHint': 'ಧನ್ಯವಾದ — ನಿಮ್ಮ ದೂರವಾಣಿ ಸಂಖ್ಯೆ ಪರಿಶೀಲಿಸಲಾಗಿದೆ.',
+  'checkout.verifyFailed': 'ಪರಿಶೀಲನೆ ವಿಫಲವಾಗಿದೆ',
+  'checkout.verifyFailedHint': 'ಆ ಕೋಡ್ ಅಮಾನ್ಯವಾಗಿದೆ ಅಥವಾ ಅವಧಿ ಮುಗಿದಿದೆ.',
+  'checkout.orderPlaced': 'ಆರ್ಡರ್ ಮಾಡಲಾಗಿದೆ',
+  'checkout.orderPlacedHint': 'ನಿಮ್ಮ ಆರ್ಡರ್ ಅಂಗಡಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ.',
+  'checkout.orderFailed': 'ಆರ್ಡರ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ',
+
+  'pay.method': 'ಪಾವತಿ ವಿಧಾನ',
+  'pay.cod': 'ಡೆಲಿವರಿ ಸಮಯದಲ್ಲಿ ನಗದು',
+  'pay.upi': 'UPI',
+  'pay.upiNotSetup': 'ಅಂಗಡಿ ಇನ್ನೂ UPI ಹೊಂದಿಸಿಲ್ಲ',
+  'pay.complete': 'ಪಾವತಿಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ',
+  'pay.payTo': '{payee} ಗೆ {amount} ಪಾವತಿಸಿ',
+  'pay.openUpi': 'UPI ಆ್ಯಪ್ ತೆರೆಯಿರಿ',
+  'pay.openUpiPay': 'ಪಾವತಿಸಲು UPI ಆ್ಯಪ್ ತೆರೆಯಿರಿ',
+  'pay.upiPlacedHint': 'ನಿಮ್ಮ UPI ಆ್ಯಪ್‌ನಲ್ಲಿ ಪಾವತಿ ಪೂರ್ಣಗೊಳಿಸಿ. ಅಂಗಡಿ ಅದನ್ನು ದೃಢಪಡಿಸಿದ ನಂತರ ನಿಮ್ಮ ಆರ್ಡರ್ ಸಿದ್ಧಪಡಿಸುತ್ತದೆ.',
+  'pay.noUpiAppTitle': 'UPI ಆ್ಯಪ್ ಕಂಡುಬಂದಿಲ್ಲ',
+  'pay.ref': 'UPI ಉಲ್ಲೇಖ (ಐಚ್ಛಿಕ)',
+  'pay.refPlaceholder': 'ಉದಾ. ವಹಿವಾಟು / UTR ಸಂಖ್ಯೆ',
+  'pay.paid': 'ನಾನು ಪಾವತಿಸಿದ್ದೇನೆ',
+  'pay.later': 'ನಂತರ ಪಾವತಿಸಿ',
+  'pay.noUpiApp': 'UPI ಆ್ಯಪ್ ಕಂಡುಬಂದಿಲ್ಲ — {vpa} ಗೆ ನೇರವಾಗಿ ಪಾವತಿಸಿ',
+  'pay.paidTitle': 'ಪಾವತಿ ದಾಖಲಿಸಲಾಗಿದೆ',
+  'pay.paidHint': 'ಅಂಗಡಿಗೆ ತಿಳಿಸಲಾಗಿದೆ. ಅವರು ಶೀಘ್ರದಲ್ಲೇ ದೃಢೀಕರಿಸುತ್ತಾರೆ.',
+};
+
+export const catalog: Record<Loc, Record<string, string>> = { en, ta, hi, kn };
+
+export type TFunc = (
+  key: string,
+  fallback: string,
+  params?: Record<string, string | number>,
+) => string;
+
+interface I18nState {
+  locale: Loc;
+  setLocale: (code: Loc) => void;
+  t: TFunc;
+}
+
+const I18nContext = createContext<I18nState | undefined>(undefined);
+
+function interpolate(text: string, params?: Record<string, string | number>): string {
+  if (!params) return text;
+  return text.replace(/\{(\w+)\}/g, (match, name: string) =>
+    name in params ? String(params[name]) : match,
+  );
+}
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocaleState] = useState<Loc>(DEFAULT_LOCALE);
+
+  // Load the persisted locale once on mount (default 'en' until resolved).
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((saved) => {
+        if (active && saved && saved in catalog) setLocaleState(saved as Loc);
+      })
+      .catch(() => {
+        // non-fatal — fall back to the default locale
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const setLocale = useCallback((code: Loc) => {
+    setLocaleState(code);
+    AsyncStorage.setItem(STORAGE_KEY, code).catch(() => {
+      // non-fatal — the in-memory locale still switches for this session
+    });
+  }, []);
+
+  const t = useCallback<TFunc>(
+    (key, fallback, params) => interpolate(catalog[locale][key] ?? fallback, params),
+    [locale],
+  );
+
+  const value = useMemo<I18nState>(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+export function useI18n(): I18nState {
+  const ctx = useContext(I18nContext);
+  if (!ctx) throw new Error('useI18n must be used within an I18nProvider');
+  return ctx;
+}
+
+/** Convenience hook returning just the translate function. */
+export function useT(): TFunc {
+  return useI18n().t;
+}

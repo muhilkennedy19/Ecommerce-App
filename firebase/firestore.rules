@@ -1,0 +1,150 @@
+rules_version = '2';
+
+// Role-based access control for the e-commerce apps.
+// The user's role lives in /users/{uid}.role and is the single source of truth,
+// mirroring the permission matrix in common/src/roles.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+    function hasUserDoc() {
+      return isSignedIn() && exists(userPath());
+    }
+    function role() {
+      return get(userPath()).data.role;
+    }
+    // All roles granted to the user: the `roles` array if present, else `[role]`.
+    function userRoles() {
+      return get(userPath()).data.get('roles', [role()]);
+    }
+    function isActive() {
+      return get(userPath()).data.active == true;
+    }
+    // Superuser is unrestricted (support/admin) and is intentionally NOT subject to the
+    // active flag — there must always be a way in. Checks both `role` and the `roles` array.
+    function isSuperuser() {
+      return hasUserDoc() && userRoles().hasAny(['superuser']);
+    }
+    // True if the signed-in user is a superuser, or an active user holding any role in `roles`.
+    function roleIn(roles) {
+      return isSuperuser() || (hasUserDoc() && isActive() && userRoles().hasAny(roles));
+    }
+
+    // ---- users (admin-side identities & roles) ----
+    // Read: self, or any role-manager. Superuser: unrestricted.
+    // Managers (admin / employee-manager): may grant/change NON-superuser roles on OTHER
+    // users, and may not touch an existing superuser — only a superuser mints superusers.
+    match /users/{uid} {
+      allow read: if isSignedIn()
+        && (request.auth.uid == uid || roleIn(['employee-manager', 'admin', 'superuser']));
+      allow write: if isSuperuser();
+      allow create, update: if roleIn(['employee-manager', 'admin'])
+        && uid != request.auth.uid
+        && request.resource.data.role != 'superuser'
+        && !request.resource.data.get('roles', []).hasAny(['superuser'])
+        && (resource == null || (resource.data.role != 'superuser'
+          && !resource.data.get('roles', []).hasAny(['superuser'])));
+    }
+
+    // ---- pendingUsers (self-registered role requests) ----
+    match /pendingUsers/{uid} {
+      allow read: if isSignedIn()
+        && (request.auth.uid == uid || roleIn(['employee-manager', 'admin', 'superuser']));
+      allow create, update: if isSignedIn() && request.auth.uid == uid;
+      allow delete: if roleIn(['employee-manager', 'admin', 'superuser']);
+    }
+
+    // ---- shop config ----
+    match /shops/{shopId} {
+      allow read: if isSignedIn();
+      allow write: if roleIn(['admin', 'superuser']);
+    }
+
+    // ---- catalog (readable by any signed-in user incl. buyers) ----
+    match /categories/{id} {
+      allow read: if isSignedIn();
+      allow write: if roleIn(['product-manager', 'admin', 'superuser']);
+    }
+    match /products/{id} {
+      allow read: if isSignedIn();
+      allow write: if roleIn(['product-manager', 'superuser']);
+    }
+
+    // ---- employees ----
+    // Employee managers manage all; an employee may update their own record (onboarding).
+    match /employees/{id} {
+      allow read: if roleIn(['employee-manager', 'superuser']);
+      allow create, delete: if roleIn(['employee-manager', 'superuser']);
+      allow update: if roleIn(['employee-manager', 'superuser'])
+        || (isSignedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    // ---- customers ----
+    // Staff with customer access manage all; a buyer owns their own doc (id == uid).
+    match /customers/{id} {
+      allow read: if roleIn(['customer-manager', 'admin', 'superuser'])
+        || (isSignedIn() && request.auth.uid == id);
+      allow write: if roleIn(['customer-manager', 'superuser'])
+        || (isSignedIn() && request.auth.uid == id);
+    }
+
+    // ---- orders ----
+    match /orders/{id} {
+      // Buyer creates their own order; staff can read; owner can read their own.
+      allow create: if isSignedIn()
+        && request.resource.data.customerId == request.auth.uid
+        && request.resource.data.status == 'new'
+        && request.resource.data.shopId is string;
+      allow read: if roleIn(['sales', 'analytics', 'admin', 'superuser'])
+        || (isSignedIn() && resource.data.customerId == request.auth.uid);
+      allow update: if roleIn(['sales', 'superuser']);
+      allow delete: if roleIn(['superuser']);
+    }
+
+    // ---- coupons (readable by any signed-in buyer to validate; managed by admins) ----
+    match /coupons/{code} {
+      allow read: if isSignedIn();
+      allow write: if roleIn(['admin', 'superuser']);
+    }
+
+    // ---- delivery zones (serviceable pincodes + fees) ----
+    match /deliveryZones/{pincode} {
+      allow read: if isSignedIn();
+      allow write: if roleIn(['admin', 'superuser']);
+    }
+
+    // ---- push tokens (owner-writable; the notify function reads via service account) ----
+    match /pushTokens/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ---- images (base64 blobs referenced by products/employees) ----
+    // Readable by any signed-in user (buyers need product images); written by content managers.
+    match /images/{id} {
+      allow read: if isSignedIn();
+      allow create, delete: if roleIn(['product-manager', 'employee-manager', 'admin', 'superuser']);
+    }
+
+    // ---- secrets (Fast2SMS key) ----
+    // ⚠️ ACCEPTED-RISK: the buyer app reads this to send OTP, so any signed-in user can
+    // read it. This exposes the third-party key to untrusted devices. Only the superuser
+    // writes it. To secure: move OTP sending behind a server and restrict reads to none.
+    match /secrets/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSuperuser();
+    }
+
+    // ---- otps (dev-grade) ----
+    // Short-lived codes. Any signed-in user can create/verify. For production, move
+    // generation + verification server-side so codes never live in client-readable docs.
+    match /otps/{id} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if roleIn(['superuser']);
+    }
+  }
+}

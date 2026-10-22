@@ -1,0 +1,227 @@
+import {
+  isStaleToday,
+  ROLE_LABELS,
+  rolesOf,
+  subscribeProducts,
+  userHasPermission,
+  userHasRole,
+  type Permission,
+  type Product,
+} from '@common';
+import { Link, Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import { Badge, Button, Card, EmptyState, Screen, SectionTitle } from '@/components/kit';
+import { useConfirm } from '@/components/feedback';
+import { ThemedText } from '@/components/themed-text';
+import { Spacing } from '@/constants/theme';
+import { shopId } from '@/lib/config';
+import { useAuth } from '@/lib/auth';
+import { useT } from '@/lib/i18n';
+
+interface Section {
+  href: string;
+  titleKey: string;
+  title: string;
+  subKey: string;
+  subtitle: string;
+  perm: Permission;
+  emoji: string;
+}
+
+const SECTIONS: Section[] = [
+  { href: '/products', titleKey: 'dash.products', title: 'Products', subKey: 'dash.products.sub', subtitle: 'Categories & items', perm: 'products.read', emoji: '🛒' },
+  { href: '/orders', titleKey: 'dash.orders', title: 'Orders', subKey: 'dash.orders.sub', subtitle: 'Incoming & history', perm: 'orders.read', emoji: '📦' },
+  { href: '/employees', titleKey: 'dash.employees', title: 'Employees', subKey: 'dash.employees.sub', subtitle: 'Onboard & manage', perm: 'employees.read', emoji: '👥' },
+  { href: '/customers', titleKey: 'dash.customers', title: 'Customers', subKey: 'dash.customers.sub', subtitle: 'View & edit', perm: 'customers.read', emoji: '🧾' },
+  { href: '/analytics', titleKey: 'dash.analytics', title: 'Analytics', subKey: 'dash.analytics.sub', subtitle: 'Trends & export', perm: 'analytics.read', emoji: '📈' },
+  { href: '/settings', titleKey: 'dash.settings', title: 'Settings', subKey: 'dash.settings.sub', subtitle: 'Shop, hours, keys', perm: 'shop.config', emoji: '⚙️' },
+  { href: '/roles', titleKey: 'dash.roles', title: 'Team & Roles', subKey: 'dash.roles.sub', subtitle: 'Assign roles', perm: 'roles.manage', emoji: '🧑‍💼' },
+  { href: '/coupons', titleKey: 'dash.coupons', title: 'Coupons', subKey: 'dash.coupons.sub', subtitle: 'Discounts & offers', perm: 'sales.discount', emoji: '🏷️' },
+];
+
+function tsToDate(ts: { toDate: () => Date } | null | undefined): Date | null {
+  return ts ? ts.toDate() : null;
+}
+
+export default function Dashboard() {
+  const { appUser, user, signOut } = useAuth();
+  const t = useT();
+  const confirm = useConfirm();
+  const [products, setProducts] = useState<Product[]>([]);
+
+  const canSeeReminders = userHasPermission(appUser, 'products.write');
+
+  useEffect(() => {
+    if (!canSeeReminders) return;
+    return subscribeProducts(shopId, setProducts);
+  }, [canSeeReminders]);
+
+  // No role yet → access pending.
+  if (user && !appUser) {
+    return (
+      <Screen scroll={false} style={{ justifyContent: 'center', gap: Spacing.four }}>
+        <Stack.Screen options={{ title: t('dash.title', 'Dashboard') }} />
+        <Card>
+          <ThemedText type="smallBold">{t('dash.accessPending', 'Access pending')}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t(
+              'dash.accessPendingHint',
+              "You're signed in as {email}, but no role has been assigned yet. Ask an admin to add you in the shop, then reload.",
+              { email: user.email ?? '' },
+            )}
+          </ThemedText>
+        </Card>
+        <Button title={t('common.signOut', 'Sign out')} variant="secondary" onPress={() => void signOut()} />
+      </Screen>
+    );
+  }
+
+  const perishableStale = products.filter(
+    (p) => p.perishable && isStaleToday(tsToDate(p.priceUpdatedAt)),
+  );
+  const stockStale = products.filter(
+    (p) => p.trackStock && isStaleToday(tsToDate(p.stockUpdatedAt)),
+  );
+
+  const visible = SECTIONS.filter((s) => userHasPermission(appUser, s.perm));
+
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: t('dash.title', 'Dashboard') }} />
+
+      <Card>
+        <ThemedText type="smallBold">
+          {appUser?.name
+            ? t('dash.helloName', 'Hello, {name}', { name: appUser.name })
+            : t('dash.hello', 'Hello')}
+        </ThemedText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one }}>
+          {rolesOf(appUser).map((r) => (
+            <Badge key={r} label={ROLE_LABELS[r]} />
+          ))}
+        </View>
+      </Card>
+
+      {canSeeReminders && stockStale.length > 0 ? (
+        <>
+          <SectionTitle>{t('dash.reminders', 'Daily reminders')}</SectionTitle>
+          <ReminderCard
+            title={t('dash.updateStock', 'Update stock ({count})', { count: stockStale.length })}
+            hint={t('dash.updateStockHint', 'Stock-tracked items not updated today.')}
+            names={stockStale.map((p) => p.name)}
+          />
+        </>
+      ) : null}
+
+      <SectionTitle>{t('dash.manage', 'Manage')}</SectionTitle>
+      {visible.length === 0 ? (
+        <EmptyState title={t('dash.nothingTitle', 'Nothing to show')} hint={t('dash.nothingHint', 'Your role has no sections enabled.')} />
+      ) : (
+        <View style={styles.grid}>
+          {canSeeReminders ? (
+            <Link href={'/price-updates' as never} asChild>
+              <Pressable style={{ flexBasis: '47%', flexGrow: 1 }}>
+                <Card style={{ gap: Spacing.one, minHeight: 96 }}>
+                  <View style={styles.tileTop}>
+                    <ThemedText type="title" style={{ fontSize: 28, lineHeight: 34 }}>
+                      💰
+                    </ThemedText>
+                    {perishableStale.length > 0 ? (
+                      <Badge label={String(perishableStale.length)} color="#F2A900" />
+                    ) : null}
+                  </View>
+                  <ThemedText type="smallBold">{t('dash.priceUpdates', 'Update prices')}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('dash.priceUpdates.sub', 'Perishables to re-price')}
+                  </ThemedText>
+                </Card>
+              </Pressable>
+            </Link>
+          ) : null}
+          {visible.map((s) => (
+            <Link key={s.href} href={s.href as never} asChild>
+              <Pressable style={{ flexBasis: '47%', flexGrow: 1 }}>
+                <Card style={{ gap: Spacing.one, minHeight: 96 }}>
+                  <ThemedText type="title" style={{ fontSize: 28, lineHeight: 34 }}>
+                    {s.emoji}
+                  </ThemedText>
+                  <ThemedText type="smallBold">{t(s.titleKey, s.title)}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t(s.subKey, s.subtitle)}
+                  </ThemedText>
+                </Card>
+              </Pressable>
+            </Link>
+          ))}
+          {userHasRole(appUser, 'superuser') ? (
+            <Link href={'/purge' as never} asChild>
+              <Pressable style={{ flexBasis: '47%', flexGrow: 1 }}>
+                <Card style={{ gap: Spacing.one, minHeight: 96 }}>
+                  <ThemedText type="title" style={{ fontSize: 28, lineHeight: 34 }}>
+                    🧹
+                  </ThemedText>
+                  <ThemedText type="smallBold">{t('dash.purge', 'Purge data')}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('dash.purge.sub', 'Reset for onboarding')}
+                  </ThemedText>
+                </Card>
+              </Pressable>
+            </Link>
+          ) : null}
+
+          {appUser ? (
+            <Link href={'/notifications' as never} asChild>
+              <Pressable style={{ flexBasis: '47%', flexGrow: 1 }}>
+                <Card style={{ gap: Spacing.one, minHeight: 96 }}>
+                  <ThemedText type="title" style={{ fontSize: 28, lineHeight: 34 }}>
+                    🔔
+                  </ThemedText>
+                  <ThemedText type="smallBold">{t('dash.notifications', 'Notifications')}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('dash.notifications.sub', 'Order alerts on/off')}
+                  </ThemedText>
+                </Card>
+              </Pressable>
+            </Link>
+          ) : null}
+        </View>
+      )}
+
+      <Button
+        title={t('common.signOut', 'Sign out')}
+        variant="secondary"
+        onPress={() =>
+          void (async () => {
+            const ok = await confirm({
+              title: t('common.signOut', 'Sign out'),
+              message: t('dash.signOutConfirm', 'Are you sure?'),
+              confirmText: t('common.signOut', 'Sign out'),
+              cancelText: t('common.cancel', 'Cancel'),
+              destructive: true,
+            });
+            if (ok) void signOut();
+          })()
+        }
+      />
+    </Screen>
+  );
+}
+
+function ReminderCard({ title, hint, names }: Readonly<{ title: string; hint: string; names: string[] }>) {
+  return (
+    <Card>
+      <ThemedText type="smallBold">{title}</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        {hint}
+      </ThemedText>
+      <ThemedText type="small">{names.slice(0, 6).join(', ')}{names.length > 6 ? '…' : ''}</ThemedText>
+    </Card>
+  );
+}
+
+const styles = StyleSheet.create({
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  tileTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+});

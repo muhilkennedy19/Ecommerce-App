@@ -1,0 +1,24 @@
+{
+  "name": "ecommerce-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serverless e-commerce — admin (seller) + buyer apps (React Native / Expo, Android-first)",
+  "workspaces": [
+    "common",
+    "admin-app",
+    "buyer-app"
+  ],
+  "scripts": {
+    "admin": "npm start --workspace admin-app",
+    "buyer": "npm start --workspace buyer-app",
+    "typecheck": "tsc -p common/tsconfig.json && tsc -p admin-app/tsconfig.json --noEmit && tsc -p buyer-app/tsconfig.json --noEmit",
+    "doctor": "./scripts/doctor.sh",
+    "android:admin": "./scripts/run.sh admin",
+    "android:buyer": "./scripts/run.sh buyer",
+    "apk:admin": "./scripts/build-apk.sh admin",
+    "apk:buyer": "./scripts/build-apk.sh buyer"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
+  }
+}
