@@ -1,10 +1,15 @@
-// Merges optional local-only overrides into the Expo config.
+// Resolves config values that must not live in version control.
 //
-// `app.local.json` is gitignored and holds private values (e.g. notifyUrl) that
-// must not be committed. When it is absent the app still builds — notifyUrl
-// falls back to '' and push/email become a graceful no-op.
+// Locally: `app.local.json` (gitignored) supplies private values such as
+// notifyUrl, and google-services.json sits next to this file.
 //
-// Copy app.local.example.json -> app.local.json and fill it in.
+// On EAS Build: only git-tracked files are uploaded, so both come from EAS
+// environment variables instead:
+//   GOOGLE_SERVICES_JSON  (type: file)    -> android.googleServicesFile
+//   NOTIFY_URL            (type: string)  -> extra.notifyUrl
+//
+// When neither is present the app still builds: notifyUrl falls back to '' and
+// push/email become a graceful no-op.
 let localExtra = {};
 try {
   localExtra = require('./app.local.json');
@@ -14,5 +19,14 @@ try {
 
 module.exports = ({ config }) => ({
   ...config,
-  extra: { ...config.extra, ...localExtra },
+  android: {
+    ...config.android,
+    googleServicesFile:
+      process.env.GOOGLE_SERVICES_JSON ?? config.android?.googleServicesFile,
+  },
+  extra: {
+    ...config.extra,
+    ...localExtra,
+    ...(process.env.NOTIFY_URL ? { notifyUrl: process.env.NOTIFY_URL } : {}),
+  },
 });
