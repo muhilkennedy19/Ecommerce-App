@@ -9,11 +9,17 @@ been done, what is still outstanding, and how to cut future releases.
 | Display name | Rajendran Fruit & Flower | Rajendran Sellers |
 | EAS project | `@mkencom/buyer-app` | `@mkencom/admin-app` |
 | EAS project id | `19acf35d-c07b-4175-b8da-de7ca354f9c5` | `77dc3e89-717f-45df-ad4e-818b13d7c57a` |
-| Keystore (EAS) | `egmE8q4QDu` (default) | created on first build |
-| Status | ✅ AAB built | ⬜ not built yet |
+| Keystore (EAS) | `egmE8q4QDu` (default) | generated on first build |
+| AAB built | ✅ | ✅ |
+| Keystore backed up | ✅ | ✅ |
+| SHA-1 in Firebase | ⬜ | ⬜ |
+| Uploaded to Play | ⬜ | ⬜ |
 
 Shared backend: Firebase project `ecommerce-rajendran` (Spark plan) + a Cloudflare
 Worker for push/email. Source: <https://github.com/muhilkennedy19/Ecommerce-App> (public).
+
+**Next action:** register / reinstate the Play developer account (§6.0), upload both
+AABs to Internal testing, then complete the fingerprint cycle in §5 and rebuild.
 
 ---
 
@@ -242,25 +248,108 @@ eas build -p android --profile production
 
 ## 6. Play Console
 
-One-time: developer account (US$25). Then per app:
+### 6.0 Prerequisite — developer account
 
-- [ ] Create the app, pick the correct package name
-- [ ] Store listing: title, short + full description, screenshots, 512×512 icon, 1024×500 feature graphic
-- [ ] **Privacy policy URL** — mandatory; the apps collect name, email, phone, delivery address
-- [ ] **Data safety** form — declare: name, email, phone, delivery address, purchase history, device push token
+<https://play.google.com/console> → **Create developer account** → **Personal**
+(vs Organization). US$25 one-time, non-refundable, non-transferable between accounts.
+Requires government-ID identity verification, which for personal accounts commonly
+takes several days. **Nothing else here can proceed until it clears**, so start it early.
+
+> **If an existing account shows "closed because it was not being used":** that is
+> Google's inactive-account policy (no published app, idle ~12 months). It is *not*
+> a policy violation, so — unlike a violation-based termination — registering again
+> is permitted.
+>
+> Order of preference:
+> 1. **Appeal for reinstatement** using the link in the closure email, or Play Console
+>    → Help & feedback → Contact support. Free, and preserves the $25 already paid.
+>    Stating that apps are ready to publish helps.
+> 2. **Use another account** that is in good standing — nothing in this repo is tied
+>    to a particular Play account.
+> 3. **Register fresh** (another $25 + re-verification).
+>
+> The appeal is worth attempting first for a reason beyond the fee: newly registered
+> personal accounts are subject to the 12-testers/14-days closed-testing requirement
+> (§6.4), while an older reinstated account may predate it.
+
+### 6.1 Get the `.aab` files
+
+```bash
+cd <app>
+eas build:list --platform android --limit 3     # prints artifact URLs
+
+mkdir -p ~/Desktop/play-uploads
+curl -L -o ~/Desktop/play-uploads/<app>-v<N>.aab "<artifact-url>"
+```
+
+Or use the **Download** button on the build's page at expo.dev.
+
+### 6.2 Create each app
+
+**All apps → Create app**. Do this twice — these are two independent Play listings.
+
+| Field | buyer-app | admin-app |
+|---|---|---|
+| App name | Rajendran Fruit & Flower | Rajendran Sellers |
+| Default language | English (India) | English (India) |
+| App or game | App | App |
+| Free or paid | Free | Free |
+
+The package name is **never typed in** — Play reads `com.ecommerce.buyer` /
+`com.ecommerce.admin` from the AAB on first upload and it is permanent thereafter.
+Uploading the wrong bundle to a listing cannot be undone; the listing must be abandoned.
+
+### 6.3 Upload to Internal testing
+
+**Test and release → Testing → Internal testing → Create new release**
+
+1. On the first release Play offers **Play App Signing** — accept. This generates the
+   app signing key whose SHA-1 is required in §5.
+2. Drag in the `.aab`. The release name auto-fills from `versionCode`.
+3. Add release notes.
+4. **Next → Save → Review release → Start rollout to Internal testing**.
+
+Then **Testers** tab → **Create email list** → add tester Gmail addresses → save →
+copy the **opt-in URL**. Testers must open that link and accept before the listing
+becomes visible to them.
+
+### 6.4 Store listing & declarations
+
+Play flags these under **Dashboard → Set up your app**. Internal testing tolerates
+some gaps; all are mandatory before closed/production, so complete them once.
+
+- [ ] Store listing: title, short + full description, screenshots,
+      512×512 icon, 1024×500 feature graphic
+- [ ] **Privacy policy URL** — mandatory; the apps collect name, email, phone, address
+- [ ] **Data safety** form — declare: name, email, phone, delivery address,
+      purchase history, device push token
 - [ ] Content rating questionnaire
 - [ ] Target audience & ads declaration (no ads)
 - [ ] **App access** — both apps are fully login-gated, so the reviewer *must* be given
       working test credentials. For admin-app the test account also needs a role
       pre-assigned in `users/{uid}`, otherwise the reviewer only ever sees the
       "waiting for approval" screen and the submission is rejected.
-- [ ] Upload the `.aab` to **Internal testing** first
-- [ ] Copy the Play App Signing SHA-1 back into Firebase (§5)
-- [ ] **Closed testing**: new personal developer accounts must run 12+ testers for
+- [ ] **Closed testing**: accounts registered after Nov 2023 must run 12+ testers for
       14 continuous days before Production unlocks
-- [ ] Promote to Production
 
 `targetSdkVersion` is already 35, which satisfies the current Play requirement.
+
+### 6.5 After the first upload
+
+**Test and release → Setup → App signing** now shows two certificates:
+
+- **App signing key certificate** — what users' installs are actually signed with.
+  **This SHA-1 must go into Firebase** (§5).
+- **Upload key certificate** — matches the EAS keystore.
+
+Feed both into §5, rebuild, and re-upload.
+
+### 6.6 Verifying
+
+Install via the **internal-testing opt-in link**, not by sideloading. A sideloaded
+build is signed with the upload key rather than Play's app signing key, so it
+exercises a different certificate path than what users receive — Google Sign-In can
+pass or fail differently.
 
 ### Distribution note for admin-app
 
