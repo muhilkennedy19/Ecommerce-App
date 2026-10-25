@@ -167,7 +167,10 @@ export interface OrderItem {
   productId: string;
   name: string;
   price: number; // unit price charged at order time
+  /** Amount in the product's unit; fractional for divisible units (0.3 = 300 g). */
   qty: number;
+  /** Selling unit at order time, so the quantity can be rendered as "300 g". */
+  unit?: ProductUnit | null;
 }
 
 /** An entry in an order's audit trail (e.g. a sales rep adjusting items). */

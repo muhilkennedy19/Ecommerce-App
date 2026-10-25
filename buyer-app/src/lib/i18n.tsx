@@ -123,6 +123,7 @@ const en: Record<string, string> = {
   'checkout.unavailableItems': 'Some items are no longer available:',
   'checkout.removeToPlace': 'Remove them to place your order.',
   'checkout.yourCart': 'Your cart',
+  'checkout.qtyHint': 'tap to type an exact amount',
   'checkout.clearCart': 'Clear cart',
   'checkout.cartEmpty': 'Cart is empty',
   'checkout.cartEmptyHint': 'Add some products from the shop first.',

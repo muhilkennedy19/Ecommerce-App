@@ -1,10 +1,12 @@
 import {
   editOrderItems,
   effectivePrice,
+  formatQty,
   fuzzyFilter,
   ORDER_STATUS_LABELS,
   PAYMENT_MODE_LABELS,
   PAYMENT_STATUS_LABELS,
+  roundMoney,
   subscribeOrders,
   subscribeProducts,
   userHasPermission,
@@ -314,10 +316,10 @@ export default function OrderDetailScreen() {
                 style={{ flexDirection: 'row', justifyContent: 'space-between' }}
               >
                 <ThemedText type="small">
-                  {i.name} x{i.qty}
+                  {i.name} x{formatQty(i.qty, i.unit)}
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
-                  ₹{i.price * i.qty}
+                  ₹{roundMoney(i.price * i.qty)}
                 </ThemedText>
               </View>
             ))}

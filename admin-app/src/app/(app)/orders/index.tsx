@@ -3,6 +3,7 @@ import {
   buildOrderBillEmail,
   buildOrderServedEmail,
   cancelOrder,
+  formatQty,
   getCustomer,
   getIdToken,
   getShop,
@@ -139,7 +140,7 @@ function isVisibleToServer(order: Order, uid: string | undefined): boolean {
 }
 
 function itemsSummary(order: Order): string {
-  return order.items.map((i) => `${i.name} x${i.qty}`).join(', ');
+  return order.items.map((i) => `${i.name} x${formatQty(i.qty, i.unit)}`).join(', ');
 }
 
 /** One-line human address from the order snapshot. */

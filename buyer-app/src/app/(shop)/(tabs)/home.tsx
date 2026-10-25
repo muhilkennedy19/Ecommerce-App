@@ -41,6 +41,14 @@ export default function Home() {
   const [loaded, setLoaded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const toggleSearch = () => {
+    setSearchOpen((open) => {
+      if (open) setSearch(''); // closing clears the filter so the list isn't silently narrowed
+      return !open;
+    });
+  };
 
   useEffect(() => subscribeShop(shopId, setShop), []);
   useEffect(() => subscribeCategories(shopId, setCategories), []);
@@ -73,7 +81,13 @@ export default function Home() {
   return (
     <View style={{ flex: 1 }}>
       <Screen>
-        <Tabs.Screen options={{ title: shopName }} />
+        <Tabs.Screen
+          options={{
+            title: shopName,
+            headerTitleAlign: 'center',
+            headerTitleStyle: { fontWeight: '700' },
+          }}
+        />
 
         {shop != null && !open ? (
           <Card style={{ backgroundColor: DANGER + '22' }}>
@@ -101,14 +115,37 @@ export default function Home() {
                       product={p}
                       canAdd={open}
                       onOpen={() => openDetail(p.id)}
-                      onAdd={() => cart.add({ productId: p.id, name: p.name, price: effectivePrice(p) })}
+                      onAdd={() => cart.add({ productId: p.id, name: p.name, price: effectivePrice(p), unit: p.unit })}
                     />
                   ))}
                 </ScrollView>
               </>
             ) : null}
 
-            <SectionTitle>{t('home.categories', 'Categories')}</SectionTitle>
+            <View style={styles.sectionHeader}>
+              <SectionTitle>{t('home.categories', 'Categories')}</SectionTitle>
+              <Pressable
+                onPress={toggleSearch}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('home.search', 'Search products')}
+                style={[styles.searchIcon, { backgroundColor: searchOpen ? PRIMARY : theme.backgroundElement }]}
+              >
+                <ThemedText style={{ fontSize: 15 }}>{searchOpen ? '\u2715' : '\u2315'}</ThemedText>
+              </Pressable>
+            </View>
+
+            {searchOpen ? (
+              <TextField
+                placeholder={t('home.search', 'Search products')}
+                value={search}
+                onChangeText={setSearch}
+                clearButtonMode="while-editing"
+                returnKeyType="search"
+                autoFocus
+              />
+            ) : null}
+
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -126,13 +163,6 @@ export default function Home() {
             </ScrollView>
 
             <SectionTitle>{t('home.products', 'Products')}</SectionTitle>
-            <TextField
-              placeholder={t('home.search', 'Search products')}
-              value={search}
-              onChangeText={setSearch}
-              clearButtonMode="while-editing"
-              returnKeyType="search"
-            />
             {visible.length === 0 ? (
               <EmptyState
                 title={t('home.noProducts', 'No products')}
@@ -149,7 +179,7 @@ export default function Home() {
                   product={p}
                   canAdd={open}
                   onOpen={() => openDetail(p.id)}
-                  onAdd={() => cart.add({ productId: p.id, name: p.name, price: effectivePrice(p) })}
+                  onAdd={() => cart.add({ productId: p.id, name: p.name, price: effectivePrice(p), unit: p.unit })}
                 />
               ))
             )}
@@ -246,7 +276,7 @@ function ProductCard({
           {outOfStock ? (
             <Badge label={t('common.unavailable', 'Unavailable')} color={DANGER} />
           ) : (
-            <Button title={t('common.addToCart', 'Add to cart')} onPress={onAdd} disabled={!canAdd} />
+            <Button title={t('common.addToCart', 'Add to cart')} onPress={onAdd} disabled={!canAdd} size="sm" />
           )}
         </View>
       </View>
@@ -284,12 +314,21 @@ function FeaturedCard({
         <ThemedText type="smallBold" numberOfLines={1}>
           {product.name}
         </ThemedText>
-        <View style={styles.priceRow}>
-          <ThemedText type="small" style={{ color: PRIMARY, fontWeight: '700' }}>
+        <View style={styles.featuredPriceRow}>
+          <ThemedText
+            type="small"
+            style={{ color: PRIMARY, fontWeight: '700', flexShrink: 1 }}
+            numberOfLines={1}
+          >
             {formatUnitPrice(effective, product.unit)}
           </ThemedText>
           {hasDiscount ? (
-            <ThemedText type="small" themeColor="textSecondary" style={styles.struck}>
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              style={[styles.struck, { flexShrink: 1 }]}
+              numberOfLines={1}
+            >
               {money(product.price)}
             </ThemedText>
           ) : null}
@@ -299,7 +338,7 @@ function FeaturedCard({
         {outOfStock ? (
           <Badge label={t('common.unavailable', 'Unavailable')} color={DANGER} />
         ) : (
-          <Button title={t('home.add', 'Add')} onPress={onAdd} disabled={!canAdd} />
+          <Button title={t('home.add', 'Add')} onPress={onAdd} disabled={!canAdd} size="sm" />
         )}
       </View>
     </Card>
@@ -319,6 +358,28 @@ const styles = StyleSheet.create({
   productCard: { flexDirection: 'row', gap: Spacing.three },
   productImage: { width: 88, height: 88, borderRadius: Spacing.two },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  // Featured cards are only 160px wide, so the price + struck original must wrap
+  // instead of running past the card edge.
+  featuredPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    flexWrap: 'wrap',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  searchIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.two,
+  },
   struck: { textDecorationLine: 'line-through' },
   cartBar: {
     flexDirection: 'row',

@@ -68,12 +68,14 @@ export function Button({
   title,
   onPress,
   variant = 'primary',
+  size = 'md',
   loading,
   disabled,
 }: {
   title: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'danger';
+  size?: 'md' | 'sm';
   loading?: boolean;
   disabled?: boolean;
 }) {
@@ -88,13 +90,16 @@ export function Button({
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.button,
+        size === 'sm' ? styles.buttonSm : null,
         { backgroundColor: bg, opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1 },
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={color} />
+        <ActivityIndicator color={color} size={size === 'sm' ? 'small' : undefined} />
       ) : (
-        <ThemedText style={[styles.buttonText, { color }]}>{title}</ThemedText>
+        <ThemedText style={[styles.buttonText, size === 'sm' ? styles.buttonTextSm : null, { color }]}>
+          {title}
+        </ThemedText>
       )}
     </Pressable>
   );
@@ -227,6 +232,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: { fontWeight: '700' },
+  buttonSm: {
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.one + 2,
+  },
+  buttonTextSm: { fontSize: 13, lineHeight: 18 },
   field: { gap: Spacing.one },
   input: {
     borderWidth: 1,

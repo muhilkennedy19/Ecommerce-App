@@ -1,16 +1,22 @@
 import {
   deliveryFeeFor,
   evaluateCoupon,
+  formatQty,
   getCoupon,
   getCustomer,
   getIdToken,
   getZone,
   buildUpiUrl,
+  isDivisibleUnit,
   isValidPhone,
+  qtyToSubUnits,
   sanitizePhone,
   saveAddresses,
   setCustomerPhone,
   shopAcceptsOrders,
+  subUnitOf,
+  subUnitsToQty,
+  SUB_UNIT_STEP,
   // Phone OTP verification disabled for now (kept for later): OtpService, Fast2SmsSender
   placeOrder,
   sendNotify,
@@ -29,7 +35,7 @@ import {
 } from '@common';
 import { router, Stack } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { useToast } from '@/components/feedback';
 import { Badge, Button, Card, DANGER, EmptyState, PRIMARY, Screen, SectionTitle, SUCCESS, TextField } from '@/components/kit';
@@ -37,7 +43,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
-import { useCart } from '@/lib/cart';
+import { useCart, type CartLine } from '@/lib/cart';
 import { notifyUrl, shopId } from '@/lib/config';
 import { useT } from '@/lib/i18n';
 
@@ -312,6 +318,7 @@ export default function Checkout() {
         name: l.name,
         price: l.price,
         qty: l.qty,
+        unit: l.unit ?? null,
       }));
       const orderId = await placeOrder({
         shopId,
@@ -422,36 +429,7 @@ export default function Checkout() {
       ) : (
         <Card style={{ gap: Spacing.two }}>
           {cart.lines.map((l) => (
-            <View key={l.productId} style={styles.cartItem}>
-              <View style={{ flex: 1 }}>
-                <ThemedText type="small">{l.name}</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {money(l.price)} × {l.qty} = {money(l.price * l.qty)}
-                </ThemedText>
-              </View>
-              <View style={styles.stepper}>
-                <Pressable
-                  onPress={() => cart.setQty(l.productId, l.qty - 1)}
-                  style={[styles.stepBtn, { borderColor: theme.backgroundSelected }]}
-                  hitSlop={6}
-                >
-                  <ThemedText type="smallBold">−</ThemedText>
-                </Pressable>
-                <ThemedText type="smallBold" style={{ minWidth: 22, textAlign: 'center' }}>
-                  {l.qty}
-                </ThemedText>
-                <Pressable
-                  onPress={() => cart.setQty(l.productId, l.qty + 1)}
-                  style={[styles.stepBtn, { borderColor: theme.backgroundSelected }]}
-                  hitSlop={6}
-                >
-                  <ThemedText type="smallBold">+</ThemedText>
-                </Pressable>
-              </View>
-              <Pressable onPress={() => cart.remove(l.productId)} hitSlop={6} style={{ paddingLeft: Spacing.one }}>
-                <ThemedText type="small" style={{ color: DANGER }}>✕</ThemedText>
-              </Pressable>
-            </View>
+            <CartLineRow key={l.productId} line={l} />
           ))}
           <Pressable onPress={() => cart.clear()} style={{ alignSelf: 'flex-end' }} hitSlop={6}>
             <ThemedText type="small" style={{ color: DANGER }}>
@@ -794,6 +772,116 @@ export default function Checkout() {
   );
 }
 
+/**
+ * One cart line. Countable items get a whole-number stepper; items priced per Kg
+ * or Litre get a sub-unit stepper plus a free-text box, so 300 g or 1200 g of a
+ * ₹/Kg product can be ordered and priced pro-rata.
+ */
+function CartLineRow({ line }: Readonly<{ line: CartLine }>) {
+  const cart = useCart();
+  const theme = useTheme();
+  const t = useT();
+  const divisible = isDivisibleUnit(line.unit);
+  const sub = subUnitOf(line.unit);
+  const step = divisible ? SUB_UNIT_STEP : 1;
+
+  // Sub-unit amount (grams) for divisible items, plain count otherwise.
+  const amount = divisible ? qtyToSubUnits(line.qty, line.unit) : line.qty;
+
+  // `draft` is only set while the field is being edited, so the displayed value
+  // follows the +/- buttons without an effect mirroring state back and forth.
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? String(amount);
+
+  const applyAmount = (next: number) => {
+    const safe = Math.max(0, next);
+    cart.setQty(line.productId, divisible ? subUnitsToQty(safe, line.unit) : safe);
+  };
+
+  const commitDraft = () => {
+    if (draft === null) return;
+    const parsed = Number(draft);
+    setDraft(null); // always fall back to the canonical value
+    if (!Number.isFinite(parsed) || parsed <= 0) return; // reject junk, snap back
+    applyAmount(divisible ? Math.round(parsed) : Math.max(1, Math.round(parsed)));
+  };
+
+  const lineTotal = line.price * line.qty;
+
+  return (
+    <View style={styles.cartLine}>
+      <View style={styles.cartItem}>
+        <View style={{ flex: 1 }}>
+          <ThemedText type="small">{line.name}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {money(line.price)}
+            {line.unit ? `/${formatQty(1, line.unit).replace('1 ', '')}` : ''} ×{' '}
+            {formatQty(line.qty, line.unit)} = {money(lineTotal)}
+          </ThemedText>
+        </View>
+        <Pressable
+          onPress={() => cart.remove(line.productId)}
+          hitSlop={6}
+          style={{ paddingLeft: Spacing.one }}
+        >
+          <ThemedText type="small" style={{ color: DANGER }}>
+            ✕
+          </ThemedText>
+        </Pressable>
+      </View>
+
+      <View style={styles.stepper}>
+        <Pressable
+          onPress={() => applyAmount(amount - step)}
+          style={[styles.stepBtn, { borderColor: theme.backgroundSelected }]}
+          hitSlop={6}
+        >
+          <ThemedText type="smallBold">−</ThemedText>
+        </Pressable>
+
+        {divisible ? (
+          <View style={styles.qtyInputWrap}>
+            <TextInput
+              value={shown}
+              onChangeText={setDraft}
+              onBlur={commitDraft}
+              onSubmitEditing={commitDraft}
+              keyboardType="numeric"
+              returnKeyType="done"
+              selectTextOnFocus
+              style={[
+                styles.qtyInput,
+                { color: theme.text, borderColor: theme.backgroundSelected },
+              ]}
+            />
+            <ThemedText type="small" themeColor="textSecondary">
+              {sub?.label}
+            </ThemedText>
+          </View>
+        ) : (
+          <ThemedText type="smallBold" style={{ minWidth: 22, textAlign: 'center' }}>
+            {line.qty}
+          </ThemedText>
+        )}
+
+        <Pressable
+          onPress={() => applyAmount(amount + step)}
+          style={[styles.stepBtn, { borderColor: theme.backgroundSelected }]}
+          hitSlop={6}
+        >
+          <ThemedText type="smallBold">+</ThemedText>
+        </Pressable>
+
+        {divisible ? (
+          <ThemedText type="small" themeColor="textSecondary" style={{ flexShrink: 1 }}>
+            {t('checkout.qtyHint', 'tap to type an exact amount')}
+          </ThemedText>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   lineRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   totalRow: { marginTop: Spacing.two },
@@ -814,6 +902,17 @@ const styles = StyleSheet.create({
   },
   couponInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.two },
   cartItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  cartLine: { gap: Spacing.one, paddingVertical: Spacing.one },
+  qtyInputWrap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  qtyInput: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    minWidth: 62,
+    textAlign: 'center',
+    fontWeight: '700',
+  },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   stepBtn: {
     borderWidth: 1,
