@@ -9,7 +9,7 @@
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
-        <mxCell id="p1-title" value="Rajendran Fruit &amp; Flower — System Architecture&lt;br/&gt;&lt;font style=&quot;font-size:12px&quot;&gt;Expo/React Native monorepo · Firebase Spark (free) · Cloudflare Workers (free)&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="p1-title" value="Shop Name — System Architecture&lt;br/&gt;&lt;font style=&quot;font-size:12px&quot;&gt;Expo/React Native monorepo · Firebase Spark (free) · Cloudflare Workers (free)&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="40" y="10" width="1380" height="60" as="geometry" />
         </mxCell>
 
@@ -31,7 +31,7 @@
         </mxCell>
 
         <!-- Buyer app -->
-        <mxCell id="p1-buyer-h" value="buyer-app  ·  com.ecommerce.buyer  ·  &quot;Rajendran Fruit &amp; Flower&quot;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+        <mxCell id="p1-buyer-h" value="buyer-app  ·  com.ecommerce.buyer  ·  &quot;Buyer&quot;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;" vertex="1" parent="1">
           <mxGeometry x="60" y="120" width="330" height="34" as="geometry" />
         </mxCell>
         <mxCell id="p1-buyer-routes" value="&lt;b&gt;src/app (expo-router)&lt;/b&gt;&lt;br/&gt;• index.tsx — boot redirect&lt;br/&gt;• sign-in.tsx — Google Sign-In&lt;br/&gt;• (shop)/_layout — CartProvider + guard&lt;br/&gt;• (shop)/(tabs)/home — catalog, search, featured&lt;br/&gt;• (shop)/(tabs)/orders — history + pagination&lt;br/&gt;• (shop)/(tabs)/profile — addresses, locale, watchlist&lt;br/&gt;• (shop)/checkout — address, pincode, coupon, COD/UPI&lt;br/&gt;• (shop)/product/[id] — detail + add to cart" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">
@@ -45,7 +45,7 @@
         </mxCell>
 
         <!-- Admin app -->
-        <mxCell id="p1-admin-h" value="admin-app  ·  com.ecommerce.admin  ·  &quot;Rajendran Sellers&quot;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+        <mxCell id="p1-admin-h" value="admin-app  ·  com.ecommerce.admin  ·  &quot;Seller&quot;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;" vertex="1" parent="1">
           <mxGeometry x="400" y="120" width="320" height="34" as="geometry" />
         </mxCell>
         <mxCell id="p1-admin-routes" value="&lt;b&gt;src/app (expo-router)&lt;/b&gt;&lt;br/&gt;• sign-in.tsx — Google + role gate&lt;br/&gt;• (app)/dashboard — overview&lt;br/&gt;• (app)/orders/ index + [id] — accept / edit / status&lt;br/&gt;• (app)/products/ index + edit — catalog, stock, images&lt;br/&gt;• (app)/employees/ index + [id] — invite, onboarding&lt;br/&gt;• (app)/customers/index · coupons · analytics&lt;br/&gt;• (app)/settings — hours, UPI VPA, discount, force-close&lt;br/&gt;• (app)/roles — grant/revoke, pending requests&lt;br/&gt;• (app)/notifications · purge" style="rounded=0;whiteSpace=wrap;html=1;align=left;spacingLeft=8;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">

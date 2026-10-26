@@ -34,10 +34,12 @@ import {
   type Shop,
 } from '@common';
 import { router, Stack } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
 import { useEffect, useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { useToast } from '@/components/feedback';
+import { LocationPicker, type LatLng } from '@/components/location-picker';
 import { Badge, Button, Card, DANGER, EmptyState, PRIMARY, Screen, SectionTitle, SUCCESS, TextField } from '@/components/kit';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -73,6 +75,9 @@ export default function Checkout() {
   // const [otpSent, setOtpSent] = useState(false);
   // const [verified, setVerified] = useState(false);
   const [placing, setPlacing] = useState(false);
+  // Set once a UPI order is placed: swaps the form for an in-app payment panel
+  // (VPA + copy + retry) so a UPI-app refusal never strands the buyer.
+  const [upiPay, setUpiPay] = useState<{ orderId: string; amount: number } | null>(null);
 
   // Payment
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cod');
@@ -80,6 +85,9 @@ export default function Checkout() {
   // Inline "add delivery address" form.
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
+  // Delivery pin for the add-address form, and per-address pin edits made at checkout.
+  const [newAddrCoords, setNewAddrCoords] = useState<LatLng | null>(null);
+  const [coordEdits, setCoordEdits] = useState<Record<string, LatLng>>({});
   const [door, setDoor] = useState('');
   const [street, setStreet] = useState('');
   const [city, setCity] = useState('');
@@ -113,6 +121,9 @@ export default function Checkout() {
         if (!active) return;
         setCustomer(c);
         setSelectedAddressId(c?.defaultAddressId ?? c?.addresses?.[0]?.id ?? null);
+        // Seed the editable field so a saved number can be corrected in place.
+        const saved = c?.phone?.trim();
+        if (saved) setPhoneInput(saved);
       })
       .catch(() => {});
     return () => {
@@ -122,9 +133,17 @@ export default function Checkout() {
 
   const addresses = customer?.addresses ?? [];
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? null;
+  // Effective delivery pin for the selected address: a checkout-time edit wins, else the
+  // coordinates saved on the address (if any). No effect/setState-on-select needed.
+  const selectedCoords: LatLng | null = selectedAddress
+    ? (coordEdits[selectedAddress.id] ??
+      (selectedAddress.lat != null && selectedAddress.lng != null
+        ? { lat: selectedAddress.lat, lng: selectedAddress.lng }
+        : null))
+    : null;
   const savedPhone = customer?.phone?.trim() ?? '';
-  // Effective phone = saved phone, or the number typed inline on this screen.
-  const effectivePhone = savedPhone || phoneInput.trim();
+  // The field is editable and seeded from the saved number, so what is typed wins.
+  const effectivePhone = phoneInput.trim() || savedPhone;
   // A phone is required and must be exactly 10 digits before an order can be placed.
   const hasPhone = isValidPhone(effectivePhone);
 
@@ -279,6 +298,8 @@ export default function Checkout() {
       city: city.trim(),
       pincode: pincode.trim(),
       landmark: landmark.trim() || null,
+      lat: newAddrCoords?.lat ?? null,
+      lng: newAddrCoords?.lng ?? null,
     };
     setSavingAddress(true);
     try {
@@ -297,6 +318,7 @@ export default function Checkout() {
       setPincode('');
       setLandmark('');
       setLabel('');
+      setNewAddrCoords(null);
     } catch (e) {
       toast({
         type: 'error',
@@ -308,11 +330,54 @@ export default function Checkout() {
     }
   };
 
+  const copyVpa = async () => {
+    await Clipboard.setStringAsync(shopVpa);
+    toast({
+      type: 'success',
+      title: t('pay.copied', 'Copied'),
+      message: t('pay.copiedHint', 'UPI ID copied — paste it in your UPI app.'),
+    });
+  };
+
+  // Fire the UPI deep link. Kept as a plain P2P intent (no `tr`) so apps like GPay
+  // don't route a personal payee through the merchant path (see common/util/payment).
+  const openUpiApp = async (orderId: string, amount: number) => {
+    try {
+      await Linking.openURL(
+        buildUpiUrl({ vpa: shopVpa, payeeName: shop?.upiPayeeName, amount, note: 'Order ' + orderId }),
+      );
+    } catch {
+      toast({
+        type: 'error',
+        title: t('pay.noUpiAppTitle', 'No UPI app found'),
+        message: t('pay.noUpiApp', 'No UPI app found — pay to {vpa} manually', { vpa: shopVpa }),
+      });
+    }
+  };
+
   const onPlaceOrder = async () => {
     if (!user || !selectedAddress || !hasPhone) return;
     const email = user.email ?? '';
     setPlacing(true);
     try {
+      // Snapshot the confirmed delivery pin onto the order's address so the seller can
+      // navigate to the exact spot. Fire-and-forget persist it back to the saved address too.
+      const addressForOrder: Address = {
+        ...selectedAddress,
+        lat: selectedCoords?.lat ?? selectedAddress.lat ?? null,
+        lng: selectedCoords?.lng ?? selectedAddress.lng ?? null,
+      };
+      if (
+        selectedCoords &&
+        (selectedCoords.lat !== selectedAddress.lat || selectedCoords.lng !== selectedAddress.lng)
+      ) {
+        const next = (customer?.addresses ?? []).map((a) =>
+          a.id === selectedAddress.id ? addressForOrder : a,
+        );
+        void saveAddresses(user.uid, next, customer?.defaultAddressId ?? selectedAddress.id).catch(
+          () => {},
+        );
+      }
       const items: OrderItem[] = cart.lines.map((l) => ({
         productId: l.productId,
         name: l.name,
@@ -326,7 +391,7 @@ export default function Checkout() {
         customerName: user.displayName ?? email,
         items,
         note: note.trim() || null,
-        address: selectedAddress,
+        address: addressForOrder,
         pincode: selectedAddress.pincode,
         deliveryFee: appliedRes ? appliedRes.deliveryFee : deliveryFee,
         couponCode: appliedCoupon?.code ?? null,
@@ -334,9 +399,11 @@ export default function Checkout() {
         customerPhone: effectivePhone,
         paymentMode,
       });
-      // If the customer had no saved phone, persist the number they typed inline.
-      if (!savedPhone && phoneInput.trim()) {
-        await setCustomerPhone(user.uid, phoneInput.trim());
+      // Persist the number whenever it differs from what's on the customer doc —
+      // the field is editable, so this also saves corrections to an existing one.
+      const typedPhone = phoneInput.trim();
+      if (typedPhone && typedPhone !== savedPhone) {
+        await setCustomerPhone(user.uid, typedPhone);
       }
       const orderTotal = grandTotal;
       cart.clear();
@@ -345,34 +412,19 @@ export default function Checkout() {
         sendNotify(notifyUrl, idToken, { event: 'new-order', shopId, orderId }),
       );
       if (paymentMode === 'upi') {
-        // Open the customer's UPI app to pay the shop. The order is already placed;
-        // the shop verifies the payment manually before accepting it (no in-app confirm).
-        try {
-          await Linking.openURL(
-            buildUpiUrl({
-              vpa: shopVpa,
-              payeeName: shop?.upiPayeeName,
-              amount: orderTotal,
-              note: 'Order ' + orderId,
-              ref: orderId,
-            }),
-          );
-          toast({
-            type: 'success',
-            title: t('checkout.orderPlaced', 'Order placed'),
-            message: t(
-              'pay.upiPlacedHint',
-              'Complete the payment in your UPI app. The shop will confirm it before preparing your order.',
-            ),
-          });
-        } catch {
-          toast({
-            type: 'error',
-            title: t('pay.noUpiAppTitle', 'No UPI app found'),
-            message: t('pay.noUpiApp', 'No UPI app found — pay to {vpa} manually', { vpa: shopVpa }),
-          });
-        }
-        router.replace('/orders' as never);
+        // Order is placed. Show the in-app payment panel and open the UPI app. We stay on
+        // this screen (no redirect) so a UPI-app refusal doesn't strand the buyer — they can
+        // copy the UPI ID and pay manually, then tap "I've paid".
+        setUpiPay({ orderId, amount: orderTotal });
+        await openUpiApp(orderId, orderTotal);
+        toast({
+          type: 'success',
+          title: t('checkout.orderPlaced', 'Order placed'),
+          message: t(
+            'pay.upiPlacedHint',
+            'Complete the payment in your UPI app. The shop will confirm it before preparing your order.',
+          ),
+        });
         return;
       }
       toast({
@@ -391,6 +443,69 @@ export default function Checkout() {
       setPlacing(false);
     }
   };
+
+  // Post-placement UPI payment panel: shown after a UPI order is placed. Gives the buyer
+  // the amount, the shop's UPI ID with a Copy button, a retry button, and a manual-pay
+  // hint — so even if the UPI app refuses the deep link, they can still pay.
+  if (upiPay) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: t('pay.complete', 'Complete payment') }} />
+        <Card style={{ gap: Spacing.one }}>
+          <ThemedText type="smallBold">{t('checkout.orderPlaced', 'Order placed')}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t(
+              'pay.upiPlacedHint',
+              'Complete the payment in your UPI app. The shop will confirm it before preparing your order.',
+            )}
+          </ThemedText>
+        </Card>
+
+        <Card style={{ gap: Spacing.two }}>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('pay.amountLabel', 'Amount')}
+          </ThemedText>
+          <ThemedText type="title" style={{ fontSize: 28, lineHeight: 34 }}>
+            {money(upiPay.amount)}
+          </ThemedText>
+
+          <ThemedText type="small" themeColor="textSecondary" style={{ marginTop: Spacing.two }}>
+            {t('pay.vpaLabel', 'UPI ID')}
+          </ThemedText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+            <ThemedText type="smallBold" style={{ flex: 1 }}>
+              {shopVpa}
+            </ThemedText>
+            <Button title={t('pay.copy', 'Copy')} variant="secondary" onPress={() => void copyVpa()} />
+          </View>
+          {shop?.upiPayeeName ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('pay.payeeLabel', 'Payee: {name}', { name: shop.upiPayeeName })}
+            </ThemedText>
+          ) : null}
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('pay.refLabel', 'Reference: Order {id}', { id: upiPay.orderId.slice(0, 6) })}
+          </ThemedText>
+        </Card>
+
+        <Button
+          title={t('pay.openUpiPay', 'Open UPI app to pay')}
+          onPress={() => void openUpiApp(upiPay.orderId, upiPay.amount)}
+        />
+        <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
+          {t(
+            'pay.manualHint',
+            'If your UPI app shows an error, copy the UPI ID above and pay manually in any UPI app, then come back.',
+          )}
+        </ThemedText>
+        <Button
+          title={t('pay.paid', "I've paid")}
+          variant="secondary"
+          onPress={() => router.replace('/orders' as never)}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
@@ -522,6 +637,10 @@ export default function Checkout() {
                 onChangeText={setLabel}
                 placeholder={t('checkout.addrLabelPlaceholder', 'e.g. Home, Work')}
               />
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('checkout.deliveryLocation', 'Delivery location')}
+              </ThemedText>
+              <LocationPicker value={newAddrCoords} onChange={setNewAddrCoords} />
               <Button
                 title={t('checkout.saveAddress', 'Save address')}
                 onPress={saveNewAddress}
@@ -543,34 +662,50 @@ export default function Checkout() {
             />
           )}
 
-          <SectionTitle>{t('checkout.contact', 'Contact')}</SectionTitle>
-          {savedPhone && isValidPhone(savedPhone) ? (
-            <Card>
-              <ThemedText type="small" themeColor="textSecondary">
-                {t('checkout.contactAt', "We'll contact you at")}
-              </ThemedText>
-              <ThemedText type="smallBold">{customer?.phone}</ThemedText>
-            </Card>
-          ) : (
-            <Card>
-              <ThemedText type="small" themeColor="textSecondary">
-                {t('checkout.addPhoneHint', 'The shop needs a phone number to reach you about your order.')}
-              </ThemedText>
-              <TextField
-                label={t('common.phoneNumber', 'Phone number')}
-                value={phoneInput}
-                onChangeText={(v) => setPhoneInput(sanitizePhone(v))}
-                placeholder={t('checkout.phonePlaceholder', '10-digit number')}
-                keyboardType="phone-pad"
-                maxLength={10}
-              />
-              {phoneInput.length > 0 && !isValidPhone(phoneInput) ? (
-                <ThemedText type="small" style={{ color: DANGER }}>
-                  {t('checkout.phoneInvalid', 'Enter a 10-digit phone number.')}
+          {selectedAddress && !showAddressForm ? (
+            <>
+              <SectionTitle>{t('checkout.deliveryLocation', 'Delivery location')}</SectionTitle>
+              <Card>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {t('checkout.confirmLocationHint', 'Confirm the exact drop point so the rider can find you.')}
                 </ThemedText>
-              ) : null}
-            </Card>
-          )}
+                <LocationPicker
+                  value={selectedCoords}
+                  onChange={(c) => setCoordEdits((m) => ({ ...m, [selectedAddress.id]: c }))}
+                />
+                {!selectedCoords ? (
+                  <ThemedText type="small" style={{ color: DANGER }}>
+                    {t('checkout.noPinWarn', 'No delivery pin yet — drop one for accurate delivery.')}
+                  </ThemedText>
+                ) : null}
+              </Card>
+            </>
+          ) : null}
+
+          <SectionTitle>{t('checkout.contact', 'Contact')}</SectionTitle>
+          <Card>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('checkout.addPhoneHint', 'The shop needs a phone number to reach you about your order.')}
+            </ThemedText>
+            <TextField
+              label={t('common.phoneNumber', 'Phone number')}
+              value={phoneInput}
+              onChangeText={(v) => setPhoneInput(sanitizePhone(v))}
+              placeholder={t('checkout.phonePlaceholder', '10-digit number')}
+              keyboardType="phone-pad"
+              maxLength={10}
+            />
+            {/* Required field: surface why Place order stays disabled. */}
+            {phoneInput.trim().length === 0 ? (
+              <ThemedText type="small" style={{ color: DANGER }}>
+                {t('checkout.phoneRequired', 'Phone number is required to place an order.')}
+              </ThemedText>
+            ) : !isValidPhone(phoneInput) ? (
+              <ThemedText type="small" style={{ color: DANGER }}>
+                {t('checkout.phoneInvalid', 'Enter a 10-digit phone number.')}
+              </ThemedText>
+            ) : null}
+          </Card>
 
           <SectionTitle>{t('checkout.coupons', 'Coupons')}</SectionTitle>
           <Card>

@@ -15,13 +15,14 @@ import {
 import { Image } from 'expo-image';
 import { router, Tabs } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Badge, Button, Card, DANGER, EmptyState, Loader, PRIMARY, Screen, SectionTitle, TextField } from '@/components/kit';
+import { Badge, Button, Card, DANGER, EmptyState, Loader, PRIMARY, SectionTitle, TextField } from '@/components/kit';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useCachedImage } from '@/hooks/use-cached-image';
-import { useShopName } from '@/hooks/use-shop-name';
+import { useShopName, useShopLogo } from '@/hooks/use-shop-name';
 import { useTheme } from '@/hooks/use-theme';
 import { useCart } from '@/lib/cart';
 import { shopId } from '@/lib/config';
@@ -42,6 +43,11 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<'name' | 'priceAsc' | 'priceDesc'>('name');
+  const [inStockOnly, setInStockOnly] = useState(false);
+
+  const toggleFilter = () => setFilterOpen((o) => !o);
 
   const toggleSearch = () => {
     setSearchOpen((open) => {
@@ -62,6 +68,8 @@ export default function Home() {
   );
 
   const open = shopAcceptsOrders(shop);
+  // Admin-uploaded shop logo (data: URI, same source as the splash) shown in the header.
+  const logoUri = useShopLogo();
 
   const featured = useMemo(() => products.filter((p) => p.active && p.featured), [products]);
 
@@ -78,92 +86,168 @@ export default function Home() {
     [byCategory, search],
   );
 
+  // Apply the in-stock filter + chosen sort on top of search/category (client-side; the
+  // whole catalog is already in memory via the realtime subscription).
+  const shown = useMemo(() => {
+    const list = inStockOnly
+      ? visible.filter((p) => !p.trackStock || (p.stock ?? 0) > 0)
+      : visible;
+    const sorted = [...list];
+    if (sortBy === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortBy === 'priceAsc') sorted.sort((a, b) => effectivePrice(a) - effectivePrice(b));
+    else sorted.sort((a, b) => effectivePrice(b) - effectivePrice(a));
+    return sorted;
+  }, [visible, inStockOnly, sortBy]);
+
   return (
     <View style={{ flex: 1 }}>
-      <Screen>
-        <Tabs.Screen
-          options={{
-            title: shopName,
-            headerTitleAlign: 'center',
-            headerTitleStyle: { fontWeight: '700' },
-          }}
-        />
+      <Tabs.Screen
+        options={{
+          headerTitleAlign: 'left',
+          headerTitle: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+              {logoUri ? (
+                <Image
+                  source={{ uri: logoUri }}
+                  style={{ width: 30, height: 30, borderRadius: 6 }}
+                  contentFit="contain"
+                />
+              ) : null}
+              <ThemedText style={{ fontWeight: '700', fontSize: 18 }} numberOfLines={1}>
+                {shopName}
+              </ThemedText>
+            </View>
+          ),
+        }}
+      />
 
-        {shop != null && !open ? (
-          <Card style={{ backgroundColor: DANGER + '22' }}>
-            <ThemedText type="smallBold" style={{ color: DANGER }}>
-              {t('home.closed', 'Not accepting orders right now — back soon!')}
-            </ThemedText>
-          </Card>
-        ) : null}
-
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['left', 'right']}>
         {!loaded ? (
-          <Loader label={t('home.loading', 'Loading products…')} />
+          <View style={styles.loaderWrap}>
+            <Loader label={t('home.loading', 'Loading products…')} />
+          </View>
         ) : (
-          <>
-            {featured.length > 0 ? (
-              <>
-                <SectionTitle>{t('home.featured', 'Featured')}</SectionTitle>
+          <FlatList
+            data={shown}
+            keyExtractor={(p) => p.id}
+            renderItem={({ item }) => (
+              <ProductCard
+                product={item}
+                canAdd={open}
+                onOpen={() => openDetail(item.id)}
+                onAdd={() => cart.add({ productId: item.id, name: item.name, price: effectivePrice(item), unit: item.unit })}
+              />
+            )}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+            initialNumToRender={8}
+            windowSize={11}
+            ListHeaderComponent={
+              <View style={{ gap: Spacing.three }}>
+                {shop != null && !open ? (
+                  <Card style={{ backgroundColor: DANGER + '22' }}>
+                    <ThemedText type="smallBold" style={{ color: DANGER }}>
+                      {t('home.closed', 'Not accepting orders right now — back soon!')}
+                    </ThemedText>
+                  </Card>
+                ) : null}
+
+                {featured.length > 0 ? (
+                  <>
+                    <SectionTitle>{t('home.featured', 'Featured')}</SectionTitle>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.featuredRow}
+                    >
+                      {featured.map((p) => (
+                        <FeaturedCard
+                          key={p.id}
+                          product={p}
+                          canAdd={open}
+                          onOpen={() => openDetail(p.id)}
+                          onAdd={() => cart.add({ productId: p.id, name: p.name, price: effectivePrice(p), unit: p.unit })}
+                        />
+                      ))}
+                    </ScrollView>
+                  </>
+                ) : null}
+
+                <View style={styles.sectionHeader}>
+                  <SectionTitle>{t('home.categories', 'Categories')}</SectionTitle>
+                  <View style={styles.headerIcons}>
+                    <Pressable
+                      onPress={toggleFilter}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('home.filter', 'Sort & filter')}
+                      style={[styles.searchIcon, { backgroundColor: filterOpen ? PRIMARY : theme.backgroundElement }]}
+                    >
+                      <ThemedText style={{ fontSize: 15 }}>{'⇅'}</ThemedText>
+                    </Pressable>
+                    <Pressable
+                      onPress={toggleSearch}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('home.search', 'Search products')}
+                      style={[styles.searchIcon, { backgroundColor: searchOpen ? PRIMARY : theme.backgroundElement }]}
+                    >
+                      <ThemedText style={{ fontSize: 15 }}>{searchOpen ? '✕' : '⌕'}</ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+
+                {searchOpen ? (
+                  <TextField
+                    placeholder={t('home.search', 'Search products')}
+                    value={search}
+                    onChangeText={setSearch}
+                    clearButtonMode="while-editing"
+                    returnKeyType="search"
+                    autoFocus
+                  />
+                ) : null}
+
+                {filterOpen ? (
+                  <Card style={{ gap: Spacing.two }}>
+                    <ThemedText type="smallBold" themeColor="textSecondary">
+                      {t('home.sortBy', 'Sort by')}
+                    </ThemedText>
+                    <View style={styles.pillWrap}>
+                      <Pill label={t('home.sortName', 'Name')} active={sortBy === 'name'} onPress={() => setSortBy('name')} />
+                      <Pill label={t('home.sortPriceAsc', 'Price ↑')} active={sortBy === 'priceAsc'} onPress={() => setSortBy('priceAsc')} />
+                      <Pill label={t('home.sortPriceDesc', 'Price ↓')} active={sortBy === 'priceDesc'} onPress={() => setSortBy('priceDesc')} />
+                    </View>
+                    <View style={styles.pillWrap}>
+                      <Pill
+                        label={t('home.inStock', 'In stock only')}
+                        active={inStockOnly}
+                        onPress={() => setInStockOnly((v) => !v)}
+                      />
+                    </View>
+                  </Card>
+                ) : null}
+
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.featuredRow}
+                  contentContainerStyle={styles.pills}
                 >
-                  {featured.map((p) => (
-                    <FeaturedCard
-                      key={p.id}
-                      product={p}
-                      canAdd={open}
-                      onOpen={() => openDetail(p.id)}
-                      onAdd={() => cart.add({ productId: p.id, name: p.name, price: effectivePrice(p), unit: p.unit })}
+                  <Pill label={t('home.all', 'All')} active={selectedCategory === null} onPress={() => setSelectedCategory(null)} />
+                  {categories.map((c) => (
+                    <Pill
+                      key={c.id}
+                      label={c.name}
+                      active={selectedCategory === c.id}
+                      onPress={() => setSelectedCategory(c.id)}
                     />
                   ))}
                 </ScrollView>
-              </>
-            ) : null}
 
-            <View style={styles.sectionHeader}>
-              <SectionTitle>{t('home.categories', 'Categories')}</SectionTitle>
-              <Pressable
-                onPress={toggleSearch}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={t('home.search', 'Search products')}
-                style={[styles.searchIcon, { backgroundColor: searchOpen ? PRIMARY : theme.backgroundElement }]}
-              >
-                <ThemedText style={{ fontSize: 15 }}>{searchOpen ? '\u2715' : '\u2315'}</ThemedText>
-              </Pressable>
-            </View>
-
-            {searchOpen ? (
-              <TextField
-                placeholder={t('home.search', 'Search products')}
-                value={search}
-                onChangeText={setSearch}
-                clearButtonMode="while-editing"
-                returnKeyType="search"
-                autoFocus
-              />
-            ) : null}
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.pills}
-            >
-              <Pill label={t('home.all', 'All')} active={selectedCategory === null} onPress={() => setSelectedCategory(null)} />
-              {categories.map((c) => (
-                <Pill
-                  key={c.id}
-                  label={c.name}
-                  active={selectedCategory === c.id}
-                  onPress={() => setSelectedCategory(c.id)}
-                />
-              ))}
-            </ScrollView>
-
-            <SectionTitle>{t('home.products', 'Products')}</SectionTitle>
-            {visible.length === 0 ? (
+                <SectionTitle>{t('home.products', 'Products')}</SectionTitle>
+              </View>
+            }
+            ListEmptyComponent={
               <EmptyState
                 title={t('home.noProducts', 'No products')}
                 hint={
@@ -172,20 +256,10 @@ export default function Home() {
                     : t('home.noneInCategory', 'Nothing available in this category yet.')
                 }
               />
-            ) : (
-              visible.map((p) => (
-                <ProductCard
-                  key={p.id}
-                  product={p}
-                  canAdd={open}
-                  onOpen={() => openDetail(p.id)}
-                  onAdd={() => cart.add({ productId: p.id, name: p.name, price: effectivePrice(p), unit: p.unit })}
-                />
-              ))
-            )}
-          </>
+            }
+          />
         )}
-      </Screen>
+      </SafeAreaView>
 
       {cart.count > 0 ? (
         <View style={[styles.cartBar, { backgroundColor: theme.backgroundElement, borderTopColor: theme.backgroundSelected }]}>
@@ -346,6 +420,10 @@ function FeaturedCard({
 }
 
 const styles = StyleSheet.create({
+  loaderWrap: { padding: Spacing.three },
+  listContent: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.six },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  pillWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   pills: { gap: Spacing.two, paddingVertical: Spacing.one },
   pill: {
     paddingHorizontal: Spacing.three,

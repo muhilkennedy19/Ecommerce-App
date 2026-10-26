@@ -2,7 +2,7 @@
   "name": "notify",
   "version": "1.0.0",
   "private": true,
-  "description": "Free external push sender (FCM HTTP v1) for the Rajendran e-commerce apps, deployed as a Cloudflare Worker. Keeps Firebase on the Spark plan.",
+  "description": "Free external push sender (FCM HTTP v1) for the e-commerce apps, deployed as a Cloudflare Worker. Keeps Firebase on the Spark plan.",
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",

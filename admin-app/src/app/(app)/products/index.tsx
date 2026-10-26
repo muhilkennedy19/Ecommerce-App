@@ -3,6 +3,7 @@ import {
   deleteCategory,
   describeExpiry,
   describePrep,
+  effectivePrice,
   fuzzyFilter,
   userHasPermission,
   subscribeCategories,
@@ -13,7 +14,8 @@ import {
 import { Stack, router } from 'expo-router';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   Badge,
@@ -21,6 +23,7 @@ import {
   Card,
   DANGER,
   EmptyState,
+  PRIMARY,
   Screen,
   SectionTitle,
   TextField,
@@ -40,6 +43,7 @@ function money(n: number): string {
 
 export default function ProductsScreen() {
   const { appUser } = useAuth();
+  const theme = useTheme();
   const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
@@ -49,6 +53,9 @@ export default function ProductsScreen() {
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [newCat, setNewCat] = useState('');
   const [search, setSearch] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<'name' | 'priceAsc' | 'priceDesc'>('name');
+  const [inStockOnly, setInStockOnly] = useState(false);
 
   const canRead = userHasPermission(appUser, 'products.read');
   const canWriteProducts = userHasPermission(appUser, 'products.write');
@@ -73,6 +80,18 @@ export default function ProductsScreen() {
     () => fuzzyFilter(byCategory, search, (p) => [p.name, p.description]),
     [byCategory, search],
   );
+
+  // In-stock filter + chosen sort, applied client-side over the in-memory catalog.
+  const shown = useMemo(() => {
+    const list = inStockOnly
+      ? filtered.filter((p) => !p.trackStock || (p.stock ?? 0) > 0)
+      : filtered;
+    const sorted = [...list];
+    if (sortBy === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortBy === 'priceAsc') sorted.sort((a, b) => effectivePrice(a) - effectivePrice(b));
+    else sorted.sort((a, b) => effectivePrice(b) - effectivePrice(a));
+    return sorted;
+  }, [filtered, inStockOnly, sortBy]);
 
   if (!canRead) {
     return (
@@ -114,73 +133,116 @@ export default function ProductsScreen() {
   };
 
   return (
-    <Screen>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['left', 'right']}>
       <Stack.Screen options={{ title: t('products.title', 'Products') }} />
+      <FlatList
+        data={shown}
+        keyExtractor={(p) => p.id}
+        renderItem={({ item }) => <ProductRow product={item} />}
+        contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={8}
+        windowSize={11}
+        ListHeaderComponent={
+          <View style={{ gap: Spacing.three }}>
+            {canWriteProducts ? (
+              <Button title={t('products.add', '+ Add product')} onPress={() => router.push('/products/edit' as never)} />
+            ) : null}
 
-      {canWriteProducts ? (
-        <Button title={t('products.add', '+ Add product')} onPress={() => router.push('/products/edit' as never)} />
-      ) : null}
+            <SectionTitle>{t('products.categories', 'Categories')}</SectionTitle>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.pillRow}
+            >
+              <Pill label={t('products.all', 'All')} selected={selectedCat === null} onPress={() => setSelectedCat(null)} />
+              {cats.map((c) => (
+                <Pill
+                  key={c.id}
+                  label={c.name}
+                  selected={selectedCat === c.id}
+                  onPress={() => setSelectedCat(c.id)}
+                  onLongPress={canWriteCategories ? () => onDeleteCategory(c) : undefined}
+                />
+              ))}
+            </ScrollView>
 
-      <SectionTitle>{t('products.categories', 'Categories')}</SectionTitle>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.pillRow}
-      >
-        <Pill label={t('products.all', 'All')} selected={selectedCat === null} onPress={() => setSelectedCat(null)} />
-        {cats.map((c) => (
-          <Pill
-            key={c.id}
-            label={c.name}
-            selected={selectedCat === c.id}
-            onPress={() => setSelectedCat(c.id)}
-            onLongPress={canWriteCategories ? () => onDeleteCategory(c) : undefined}
+            {canWriteCategories ? (
+              <Card>
+                <TextField
+                  label={t('products.addCategory', 'Add category')}
+                  placeholder={t('products.categoryName', 'Category name')}
+                  value={newCat}
+                  onChangeText={setNewCat}
+                  onSubmitEditing={onAddCategory}
+                  returnKeyType="done"
+                />
+                <Button title={t('products.addCategory', 'Add category')} variant="secondary" onPress={onAddCategory} />
+                {cats.length > 0 ? (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('products.longPressDelete', 'Long-press a category pill to delete it.')}
+                  </ThemedText>
+                ) : null}
+              </Card>
+            ) : null}
+
+            <SectionTitle>{t('products.title', 'Products')}</SectionTitle>
+            <View style={styles.searchRow}>
+              <View style={{ flex: 1 }}>
+                <TextField
+                  placeholder={t('products.search', 'Search products')}
+                  value={search}
+                  onChangeText={setSearch}
+                  clearButtonMode="while-editing"
+                  returnKeyType="search"
+                />
+              </View>
+              <Pressable
+                onPress={() => setFilterOpen((o) => !o)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('products.filter', 'Sort & filter')}
+                style={[styles.searchIcon, { backgroundColor: filterOpen ? PRIMARY : theme.backgroundElement }]}
+              >
+                <ThemedText style={{ fontSize: 16, color: filterOpen ? '#ffffff' : theme.text }}>{'⇅'}</ThemedText>
+              </Pressable>
+            </View>
+
+            {filterOpen ? (
+              <Card style={{ gap: Spacing.two }}>
+                <ThemedText type="smallBold" themeColor="textSecondary">
+                  {t('products.sortBy', 'Sort by')}
+                </ThemedText>
+                <View style={styles.pillWrap}>
+                  <Pill label={t('products.sortName', 'Name')} selected={sortBy === 'name'} onPress={() => setSortBy('name')} />
+                  <Pill label={t('products.sortPriceAsc', 'Price ↑')} selected={sortBy === 'priceAsc'} onPress={() => setSortBy('priceAsc')} />
+                  <Pill label={t('products.sortPriceDesc', 'Price ↓')} selected={sortBy === 'priceDesc'} onPress={() => setSortBy('priceDesc')} />
+                </View>
+                <View style={styles.pillWrap}>
+                  <Pill
+                    label={t('products.inStock', 'In stock only')}
+                    selected={inStockOnly}
+                    onPress={() => setInStockOnly((v) => !v)}
+                  />
+                </View>
+              </Card>
+            ) : null}
+          </View>
+        }
+        ListEmptyComponent={
+          <EmptyState
+            title={t('products.noneTitle', 'No products')}
+            hint={
+              search.trim()
+                ? t('products.noMatch', 'No products match "{query}"', { query: search.trim() })
+                : canWriteProducts
+                  ? t('products.addHint', 'Tap "+ Add product" to create one.')
+                  : undefined
+            }
           />
-        ))}
-      </ScrollView>
-
-      {canWriteCategories ? (
-        <Card>
-          <TextField
-            label={t('products.addCategory', 'Add category')}
-            placeholder={t('products.categoryName', 'Category name')}
-            value={newCat}
-            onChangeText={setNewCat}
-            onSubmitEditing={onAddCategory}
-            returnKeyType="done"
-          />
-          <Button title={t('products.addCategory', 'Add category')} variant="secondary" onPress={onAddCategory} />
-          {cats.length > 0 ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              {t('products.longPressDelete', 'Long-press a category pill to delete it.')}
-            </ThemedText>
-          ) : null}
-        </Card>
-      ) : null}
-
-      <SectionTitle>{t('products.title', 'Products')}</SectionTitle>
-      <TextField
-        placeholder={t('products.search', 'Search products')}
-        value={search}
-        onChangeText={setSearch}
-        clearButtonMode="while-editing"
-        returnKeyType="search"
+        }
       />
-      {filtered.length === 0 ? (
-        <EmptyState
-          title={t('products.noneTitle', 'No products')}
-          hint={
-            search.trim()
-              ? t('products.noMatch', 'No products match "{query}"', { query: search.trim() })
-              : canWriteProducts
-                ? t('products.addHint', 'Tap "+ Add product" to create one.')
-                : undefined
-          }
-        />
-      ) : (
-        filtered.map((p) => <ProductRow key={p.id} product={p} />)
-      )}
-    </Screen>
+    </SafeAreaView>
   );
 }
 
@@ -274,6 +336,16 @@ function Pill({
 }
 
 const styles = StyleSheet.create({
+  listContent: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.six },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  searchIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   pillRow: { gap: Spacing.two, paddingVertical: Spacing.one },
   pill: {
     paddingHorizontal: Spacing.three,

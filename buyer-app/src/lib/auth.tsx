@@ -29,7 +29,7 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-const DEFAULT_SHOP_NAME = 'Rajendran Fruit & Flower';
+const DEFAULT_SHOP_NAME = 'Buyer';
 
 /** Best-effort one-time welcome email; resolves the live shop name, falls back to the brand. */
 async function sendWelcomeEmail(to: string, name: string): Promise<void> {

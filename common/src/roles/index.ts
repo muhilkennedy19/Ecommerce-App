@@ -20,6 +20,7 @@ export const PERMISSIONS = [
   'sales.override',
   'roles.manage',
   'secrets.manage',
+  'pos.use',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -45,6 +46,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   'employee-manager': ['employees.read', 'employees.write', 'roles.manage'],
   'customer-manager': ['customers.read', 'customers.write'],
   sales: ['orders.read', 'orders.serve'],
+  pos: ['pos.use', 'products.read', 'orders.read', 'orders.serve', 'sales.discount'],
   analytics: ['analytics.read', 'orders.read'],
 };
 
@@ -87,6 +89,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   'employee-manager': 'Employee Manager',
   'customer-manager': 'Customer Manager',
   sales: 'Sales',
+  pos: 'POS',
   analytics: 'Analytics',
 };
 
@@ -97,5 +100,6 @@ export const ALL_ROLES: Role[] = [
   'employee-manager',
   'customer-manager',
   'sales',
+  'pos',
   'analytics',
 ];

@@ -25,7 +25,6 @@ import {
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 
 import {
   Badge,
@@ -95,7 +94,7 @@ async function emailCustomerAfter(
     const customer = await getCustomer(order.customerId);
     const to = customer?.email;
     if (!to) return;
-    let shopName = 'Rajendran Fruit & Flower';
+    let shopName = 'Seller';
     try {
       const shop = await getShop(shopId);
       if (shop?.name) shopName = shop.name;
@@ -160,10 +159,6 @@ export function contactCopyText(order: Order): string {
   return lines.join('\n');
 }
 
-async function copyToClipboard(text: string): Promise<void> {
-  await Clipboard.setStringAsync(text);
-}
-
 /**
  * Customer name/phone/address, shared by the list and detail screens. The copy
  * actions (and the Call button) render only when `showActions` is set — the list
@@ -174,10 +169,11 @@ export function ContactBlock({
   showActions = true,
 }: Readonly<{ order: Order; showActions?: boolean }>) {
   const t = useT();
-  const toast = useToast();
   const phone = order.customerPhone ?? undefined;
   const address = formatAddress(order.address);
-  const onCopied = () => toast({ type: 'info', message: t('common.copied', 'Copied') });
+  const lat = order.address?.lat;
+  const lng = order.address?.lng;
+  const hasPin = typeof lat === 'number' && typeof lng === 'number';
   return (
     <View style={{ gap: Spacing.two }}>
       <ThemedText type="small" themeColor="textSecondary">
@@ -190,6 +186,14 @@ export function ContactBlock({
           {address}
         </ThemedText>
       ) : null}
+      {typeof lat === 'number' && typeof lng === 'number' ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('orders.pinned', '📍 Delivery pin: {lat}, {lng}', {
+            lat: lat.toFixed(5),
+            lng: lng.toFixed(5),
+          })}
+        </ThemedText>
+      ) : null}
       {showActions ? (
         <View style={{ flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' }}>
           {phone ? (
@@ -197,21 +201,15 @@ export function ContactBlock({
               <Button title={t('orders.call', 'Call')} onPress={() => void Linking.openURL('tel:' + phone)} />
             </View>
           ) : null}
-          {phone ? (
+          {hasPin ? (
             <View style={{ flex: 1 }}>
               <Button
-                title={t('orders.copyPhone', 'Copy phone')}
-                variant="secondary"
-                onPress={() => void copyToClipboard(phone).then(onCopied)}
-              />
-            </View>
-          ) : null}
-          {address ? (
-            <View style={{ flex: 1 }}>
-              <Button
-                title={t('orders.copyAddress', 'Copy address')}
-                variant="secondary"
-                onPress={() => void copyToClipboard(contactCopyText(order)).then(onCopied)}
+                title={t('orders.navigate', 'Navigate')}
+                onPress={() =>
+                  void Linking.openURL(
+                    `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+                  )
+                }
               />
             </View>
           ) : null}

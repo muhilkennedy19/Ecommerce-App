@@ -95,14 +95,16 @@ service cloud.firestore {
 
     // ---- orders ----
     match /orders/{id} {
-      // Buyer creates their own order; staff can read; owner can read their own.
-      allow create: if isSignedIn()
-        && request.resource.data.customerId == request.auth.uid
-        && request.resource.data.status == 'new'
-        && request.resource.data.shopId is string;
-      allow read: if roleIn(['sales', 'analytics', 'admin', 'superuser'])
+      // Buyer creates their own 'new' order; POS/staff create in-store sales (any status).
+      allow create: if request.resource.data.shopId is string && (
+        (isSignedIn()
+          && request.resource.data.customerId == request.auth.uid
+          && request.resource.data.status == 'new')
+        || roleIn(['pos', 'sales', 'admin', 'superuser'])
+      );
+      allow read: if roleIn(['pos', 'sales', 'analytics', 'admin', 'superuser'])
         || (isSignedIn() && resource.data.customerId == request.auth.uid);
-      allow update: if roleIn(['sales', 'superuser']);
+      allow update: if roleIn(['pos', 'sales', 'superuser']);
       allow delete: if roleIn(['superuser']);
     }
 

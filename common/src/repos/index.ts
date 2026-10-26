@@ -35,6 +35,7 @@ import type {
   OrderChange,
   OrderItem,
   OrderStatus,
+  PaymentMode,
   PendingUser,
   Product,
   PushToken,
@@ -283,7 +284,7 @@ export async function placeOrder(input: {
   discount?: number;
   customerPhone?: string | null;
   placedAtMs?: number;
-  paymentMode?: 'cod' | 'upi';
+  paymentMode?: PaymentMode;
 }): Promise<string> {
   const subtotal = input.items.reduce((sum, i) => sum + i.price * i.qty, 0);
   const deliveryFee = input.deliveryFee ?? 0;
@@ -326,9 +327,55 @@ export async function placeOrder(input: {
 }
 
 /**
- * Sales/superuser edits an accepted order's items. Recomputes totals, appends a change-log
- * entry, and accumulates `amountDelta` (+ customer pays more, − refund) for manual settlement.
+ * Record an in-store POS sale. Written to the same `orders` collection (so it flows into
+ * order history + analytics) with `channel: 'pos'`, already `served` and `verified` (paid at
+ * the counter). The operator is the signed-in staff member. Returns the new order id.
  */
+export async function placePosSale(input: {
+  shopId: string;
+  operatorId: string;
+  operatorName?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  items: OrderItem[];
+  paymentMode: PaymentMode;
+  nowMs?: number;
+}): Promise<string> {
+  const subtotal = input.items.reduce((sum, i) => sum + i.price * i.qty, 0);
+  const total = Math.max(0, Math.round(subtotal * 100) / 100);
+  const at = input.nowMs ?? Date.now();
+  const r = await addDoc(collection(getDb(), 'orders'), {
+    shopId: input.shopId,
+    channel: 'pos',
+    // The operator owns the record (satisfies the per-user create rule); no buyer account.
+    customerId: input.operatorId,
+    customerName: input.customerName?.trim() || 'Walk-in',
+    customerPhone: input.customerPhone?.trim() || null,
+    items: input.items,
+    subtotal,
+    total,
+    deliveryFee: 0,
+    couponCode: null,
+    discount: 0,
+    grandTotal: total,
+    paymentMode: input.paymentMode,
+    paymentStatus: 'verified', // paid at the counter
+    upiRef: null,
+    address: null,
+    pincode: null,
+    status: 'served',
+    assignedTo: input.operatorId,
+    note: 'POS sale',
+    changeLog: [],
+    statusLog: [
+      { at, by: input.operatorId, byName: input.operatorName ?? null, status: 'served' },
+    ],
+    amountDelta: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return r.id;
+}
 export async function editOrderItems(
   order: Order,
   items: OrderItem[],

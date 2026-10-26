@@ -1,9 +1,9 @@
 import {
   getIdToken,
-  hasPermission,
   inviteEmployee,
   sendEmail,
   subscribeEmployees,
+  userHasPermission,
   type Employee,
   type EmployeeStatus,
 } from '@common';
@@ -31,14 +31,15 @@ export default function EmployeesScreen() {
   const { appUser } = useAuth();
   const t = useT();
   const toast = useToast();
-  const role = appUser?.role;
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [inviting, setInviting] = useState(false);
 
-  const canRead = hasPermission(role, 'employees.read');
-  const canWrite = hasPermission(role, 'employees.write');
+  // Must evaluate the whole roles[] union — appUser.role is the legacy single field
+  // and is unset for users granted a role through the multi-role picker.
+  const canRead = userHasPermission(appUser, 'employees.read');
+  const canWrite = userHasPermission(appUser, 'employees.write');
 
   useEffect(() => {
     if (!canRead) return;

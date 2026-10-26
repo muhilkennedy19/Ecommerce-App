@@ -1,9 +1,9 @@
 import {
   deleteImage,
   getEmployee,
-  hasPermission,
   putImage,
   updateEmployee,
+  userHasPermission,
   type Employee,
 } from '@common';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -56,9 +56,10 @@ export default function EmployeeDetailScreen() {
   const { appUser } = useAuth();
   const t = useT();
   const toast = useToast();
-  const role = appUser?.role;
-  const canWrite = hasPermission(role, 'employees.write');
-  const canRead = hasPermission(role, 'employees.read');
+  // Must evaluate the whole roles[] union — appUser.role is the legacy single field
+  // and is unset for users granted a role through the multi-role picker.
+  const canWrite = userHasPermission(appUser, 'employees.write');
+  const canRead = userHasPermission(appUser, 'employees.read');
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);

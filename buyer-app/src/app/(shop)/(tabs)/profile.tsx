@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useToast } from '@/components/feedback';
+import { LocationPicker } from '@/components/location-picker';
 import { Badge, Button, Card, DANGER, EmptyState, PRIMARY, Screen, SectionTitle, TextField } from '@/components/kit';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -208,6 +209,13 @@ export default function Profile() {
                 label={t('profile.landmark', 'Landmark (optional)')}
                 value={a.landmark ?? ''}
                 onChangeText={(v) => updateAddress(a.id, { landmark: v })}
+              />
+              <ThemedText type="small" themeColor="textSecondary" style={{ marginTop: Spacing.one }}>
+                {t('profile.deliveryLocation', 'Delivery location')}
+              </ThemedText>
+              <LocationPicker
+                value={a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null}
+                onChange={(c) => updateAddress(a.id, { lat: c.lat, lng: c.lng })}
               />
               <View style={{ flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.one }}>
                 {!isDefault ? (

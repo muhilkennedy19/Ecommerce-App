@@ -4,33 +4,43 @@ import { Image } from 'expo-image';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { LOGO_KEY } from '@/hooks/use-shop-name';
 import { ThemedText } from './themed-text';
 
 /** Matches the native splash background so there is no colour flash on handover. */
 const BRAND_BG = '#2E7D32';
 const MIN_VISIBLE_MS = 2000;
 
-// Swap this file to change the logo — keep the name so nothing else needs editing.
-const LOGO = require('../../assets/images/splash-icon.png');
+/** Fallback until the admin uploads a logo in Settings → Shop logo. */
+const FALLBACK_LOGO = require('../../assets/images/splash-icon.png');
 
 /** Cache key written by `useShopName`; read directly so the splash needs no Firebase. */
 const SHOP_NAME_CACHE_KEY = 'shopName';
 
 function BrandSplash() {
-  const [name, setName] = useState<string>(() => Constants.expoConfig?.name ?? 'Shop');
+  const [name, setName] = useState<string>(() => Constants.expoConfig?.name ?? 'Buyer');
+  const [logoUri, setLogoUri] = useState<string | null>(null);
 
   useEffect(() => {
-    // Async callback, so this does not cascade renders on mount.
-    AsyncStorage.getItem(SHOP_NAME_CACHE_KEY)
-      .then((cached) => {
-        if (cached) setName(cached);
+    // Async callbacks, so these do not cascade renders on mount.
+    AsyncStorage.multiGet([SHOP_NAME_CACHE_KEY, LOGO_KEY])
+      .then((entries) => {
+        for (const [key, value] of entries) {
+          if (!value) continue;
+          if (key === SHOP_NAME_CACHE_KEY) setName(value);
+          if (key === LOGO_KEY) setLogoUri(value);
+        }
       })
       .catch(() => {});
   }, []);
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.root]}>
-      <Image source={LOGO} style={styles.logo} contentFit="contain" />
+      <Image
+        source={logoUri ? { uri: logoUri } : FALLBACK_LOGO}
+        style={styles.logo}
+        contentFit="contain"
+      />
       <ThemedText type="title" style={styles.name}>
         {name}
       </ThemedText>

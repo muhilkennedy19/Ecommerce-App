@@ -1,32 +1,51 @@
-// Resolves config values that must not live in version control.
+// Dynamic Expo config.
 //
-// Locally: `app.local.json` (gitignored) supplies private values such as
-// notifyUrl, and google-services.json sits next to this file.
+// The committed app.json holds brand-NEUTRAL defaults (name "Buyer", bundled icons) so the
+// real shop identity never lands in the repo. This file layers an OPTIONAL, git-ignored
+// local brand override on top — applied only on the build machine:
 //
-// On EAS Build: only git-tracked files are uploaded, so both come from EAS
-// environment variables instead:
-//   GOOGLE_SERVICES_JSON  (type: file)    -> android.googleServicesFile
-//   NOTIFY_URL            (type: string)  -> extra.notifyUrl
+//   • Name  → brand.local.json : { "name": "Rajendran Fruits & Flowers" }
+//   • Icons → drop files into assets/brand.local/ (auto-detected, optional):
+//        icon.png                 (app icon / iOS / legacy launcher)
+//        adaptive-foreground.png  (Android adaptive icon foreground)
+//        adaptive-background.png  (Android adaptive icon background, optional)
 //
-// When neither is present the app still builds: notifyUrl falls back to '' and
-// push/email become a graceful no-op.
-let localExtra = {};
-try {
-  localExtra = require('./app.local.json');
-} catch {
-  // no local overrides present
+// Both brand.local.json and assets/brand.local/ are git-ignored (see .gitignore). When they
+// are absent (CI, other clones), the app builds with the neutral app.json defaults.
+//
+// Icon/name changes are baked at `expo prebuild` time, so re-run prebuild + build to apply.
+const fs = require('fs');
+const path = require('path');
+
+/** Return the relative path if the asset exists locally, else null. */
+function localAsset(rel) {
+  return fs.existsSync(path.join(__dirname, rel)) ? rel : null;
 }
 
-module.exports = ({ config }) => ({
-  ...config,
-  android: {
-    ...config.android,
-    googleServicesFile:
-      process.env.GOOGLE_SERVICES_JSON ?? config.android?.googleServicesFile,
-  },
-  extra: {
-    ...config.extra,
-    ...localExtra,
-    ...(process.env.NOTIFY_URL ? { notifyUrl: process.env.NOTIFY_URL } : {}),
-  },
-});
+module.exports = ({ config }) => {
+  let brand = {};
+  try {
+    brand = require('./brand.local.json');
+  } catch {
+    // No local brand file — keep the committed neutral defaults from app.json.
+  }
+
+  if (brand.name) config.name = brand.name;
+
+  const icon = localAsset('./assets/brand.local/icon.png');
+  if (icon) config.icon = icon;
+
+  const foreground = localAsset('./assets/brand.local/adaptive-foreground.png');
+  const background = localAsset('./assets/brand.local/adaptive-background.png');
+  if (foreground) {
+    config.android = config.android || {};
+    // Replace the adaptive icon wholesale so the neutral default background/monochrome
+    // images don't bleed through. The foreground logo is pre-padded into the safe zone,
+    // and sits on the brand green (or a provided brand background image).
+    config.android.adaptiveIcon = background
+      ? { foregroundImage: foreground, backgroundImage: background }
+      : { foregroundImage: foreground, backgroundColor: '#2E7D32' };
+  }
+
+  return config;
+};

@@ -1,5 +1,5 @@
 /**
- * Free external push sender for the Rajendran e-commerce apps.
+ * Free external push sender for the e-commerce apps.
  *
  * Runs as a Cloudflare Worker and talks to Firebase entirely over REST, so the
  * Firebase project can stay on the free Spark plan (no Cloud Functions / Blaze).
@@ -808,7 +808,7 @@ function buildGmailRawMessage(
 
   let message: string;
   if (useHtml) {
-    const boundary = "alt_boundary_rajendran_mail";
+    const boundary = "alt_boundary_app_mail";
     message = [
       ...headers,
       `Content-Type: multipart/alternative; boundary="${boundary}"`,

@@ -1,7 +1,9 @@
 import {
   DEFAULT_OPERATING_HOURS,
+  deleteImage,
   deleteZone,
   getFast2SmsKey,
+  putImage,
   setFast2SmsKey,
   shopAcceptsOrders,
   subscribeDeliveryZones,
@@ -15,6 +17,9 @@ import {
   type Shop,
   type Weekday,
 } from '@common';
+import { Image } from 'expo-image';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
 import { Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
@@ -34,6 +39,7 @@ import {
 import { useConfirm, useToast } from '@/components/feedback';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { useCachedImage } from '@/hooks/use-cached-image';
 import { shopId } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
 import { LOCALES, useI18n } from '@/lib/i18n';
@@ -80,6 +86,9 @@ export default function Settings() {
   const [upiVpa, setUpiVpa] = useState('');
   const [upiPayee, setUpiPayee] = useState('');
   const [savingUpi, setSavingUpi] = useState(false);
+
+  const [savingLogo, setSavingLogo] = useState(false);
+  const logoUri = useCachedImage(shop?.logoImageId);
 
   const [fast2sms, setFast2sms] = useState<string | null>(null);
   const [keyInput, setKeyInput] = useState('');
@@ -134,6 +143,66 @@ export default function Settings() {
       toast({ type: 'error', title: t('settings.couldNotCreate', 'Could not create shop'), message: String(e) });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function pickLogo() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    const uri = result.assets?.[0]?.uri;
+    if (!uri) return;
+
+    setSavingLogo(true);
+    const previousId = shop?.logoImageId ?? null;
+    try {
+      // Logos render at ~140px, so 512px keeps the Firestore doc small.
+      const ctx = ImageManipulator.manipulate(uri);
+      ctx.resize({ width: 512 });
+      const ref = await ctx.renderAsync();
+      const out = await ref.saveAsync({ compress: 0.8, format: SaveFormat.PNG, base64: true });
+      if (!out.base64) throw new Error('Could not process the selected image.');
+
+      const imageId = await putImage(out.base64, 'image/png');
+      await updateShop(shopId, { logoImageId: imageId });
+      // Only drop the old blob once the new one is referenced.
+      if (previousId) await deleteImage(previousId).catch(() => {});
+      toast({
+        type: 'success',
+        title: t('common.saved', 'Saved') + ' ✓',
+        message: t('settings.logoUpdated', 'Shop logo updated.'),
+      });
+    } catch (e) {
+      toast({
+        type: 'error',
+        title: t('settings.logoFailed', 'Could not update logo'),
+        message: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSavingLogo(false);
+    }
+  }
+
+  async function removeLogo() {
+    const ok = await confirm({
+      title: t('settings.logoRemove', 'Remove logo'),
+      message: t('settings.logoRemoveConfirm', 'The buyer app will fall back to the default logo.'),
+      confirmText: t('common.delete', 'Delete'),
+      cancelText: t('common.cancel', 'Cancel'),
+      destructive: true,
+    });
+    if (!ok) return;
+    const previousId = shop?.logoImageId ?? null;
+    try {
+      await updateShop(shopId, { logoImageId: null });
+      if (previousId) await deleteImage(previousId).catch(() => {});
+    } catch (e) {
+      toast({
+        type: 'error',
+        title: t('settings.logoFailed', 'Could not update logo'),
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
@@ -346,6 +415,46 @@ export default function Settings() {
       <Card>
         <TextField label={t('settings.shopName', 'Shop name')} value={name} onChangeText={setName} placeholder={t('settings.myShop', 'My Shop')} />
         <Button title={t('settings.saveDetails', 'Save details')} loading={saving} onPress={() => void saveDetails()} />
+      </Card>
+
+      <SectionTitle>{t('settings.logo', 'Shop logo')}</SectionTitle>
+      <Card style={{ gap: Spacing.two }}>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t(
+            'settings.logoHint',
+            'Shown on the buyer app launch screen with the shop name. Square images work best.',
+          )}
+        </ThemedText>
+        <View style={{ alignItems: 'center' }}>
+          {logoUri ? (
+            <Image
+              source={{ uri: logoUri }}
+              style={{ width: 120, height: 120, borderRadius: Spacing.two }}
+              contentFit="contain"
+            />
+          ) : (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('settings.logoNone', 'No logo uploaded yet.')}
+            </ThemedText>
+          )}
+        </View>
+        <Button
+          title={
+            logoUri
+              ? t('settings.logoChange', 'Change logo')
+              : t('settings.logoPick', 'Upload logo')
+          }
+          variant="secondary"
+          loading={savingLogo}
+          onPress={() => void pickLogo()}
+        />
+        {shop?.logoImageId ? (
+          <Button
+            title={t('settings.logoRemove', 'Remove logo')}
+            variant="danger"
+            onPress={() => void removeLogo()}
+          />
+        ) : null}
       </Card>
 
       <SectionTitle>{t('payments.upiSection', 'UPI payments')}</SectionTitle>

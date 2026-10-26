@@ -8,6 +8,7 @@ export type Role =
   | 'employee-manager'
   | 'customer-manager'
   | 'sales'
+  | 'pos'
   | 'analytics';
 
 /** An admin/seller-side identity. `users/{uid}` is the source of truth for role checks. */
@@ -49,6 +50,8 @@ export interface Shop {
   /** Receiver UPI VPA for buyer UPI payments (e.g. "shop@okicici"). */
   upiVpa?: string | null;
   upiPayeeName?: string | null;
+  /** `images/{id}` holding the shop logo shown on the buyer launch screen. */
+  logoImageId?: string | null;
   createdAt?: Timestamp;
 }
 
@@ -61,6 +64,12 @@ export interface Category {
 
 export type PrepUnit = 'hours' | 'days';
 export type ProductUnit = 'kg' | 'g' | 'litre' | 'ml' | 'piece';
+
+/** A scanned inventory barcode and the on-hand quantity counted against it. */
+export interface Barcode {
+  code: string;
+  qty: number;
+}
 export interface PrepTime {
   value: number;
   unit: PrepUnit;
@@ -95,6 +104,20 @@ export interface Product {
   stock?: number | null;
   stockUpdatedAt?: Timestamp | null;
 
+  /**
+   * Fixed-quantity (packaged) item: even for a divisible unit (kg/litre), buyer/POS may only
+   * pick whole counts — no custom weight entry. Default (false/absent) keeps divisible units
+   * weighable. Non-divisible units (piece) are always whole counts regardless.
+   */
+  fixedQty?: boolean | null;
+
+  /**
+   * Optional barcode-based inventory. When a product has ≥1 barcode, its `stock` is the sum
+   * of these quantities and `trackStock` is forced on. Products without barcodes keep using
+   * the manual `stock`/`trackStock` fields as before.
+   */
+  barcodes?: Barcode[] | null;
+
   /** Made-to-order items (e.g. a garland); buyer sees the prep lead time. */
   onDemand: boolean;
   prepTime?: PrepTime | null;
@@ -128,6 +151,9 @@ export interface Address {
   city: string;
   pincode: string;
   landmark?: string | null;
+  /** Delivery pin dropped by the buyer (WGS84). Lets the seller navigate to the exact spot. */
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface Customer {
@@ -159,7 +185,7 @@ export interface DeliveryZone {
 export type OrderStatus = 'new' | 'accepted' | 'out_for_delivery' | 'served' | 'cancelled';
 
 /** How the order is paid. UPI is a deep-link flow reconciled manually (not auto-verified). */
-export type PaymentMode = 'cod' | 'upi';
+export type PaymentMode = 'cod' | 'upi' | 'cash' | 'card';
 /** pending → (buyer taps paid) claimed → (admin reconciles) verified. COD stays pending until served. */
 export type PaymentStatus = 'pending' | 'claimed' | 'verified';
 
@@ -205,6 +231,8 @@ export interface Order {
   discount?: number; // coupon discount applied (₹)
   grandTotal?: number;
   paymentMode?: PaymentMode;
+  /** Sales channel: online buyer order (default) or an in-store POS sale. */
+  channel?: 'online' | 'pos' | null;
   paymentStatus?: PaymentStatus;
   upiRef?: string | null; // buyer-provided UPI reference, if any
   address?: Address | null; // snapshot at order time

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Rajendran Fruit & Flower",
+    "name": "Buyer",
     "slug": "buyer-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -36,7 +36,13 @@
         }
       ],
       "@react-native-google-signin/google-signin",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow the app to use your location to set your delivery point on the map."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

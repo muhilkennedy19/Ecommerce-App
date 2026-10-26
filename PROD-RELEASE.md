@@ -6,7 +6,7 @@ been done, what is still outstanding, and how to cut future releases.
 | | buyer-app | admin-app |
 |---|---|---|
 | Play package | `com.ecommerce.buyer` | `com.ecommerce.admin` |
-| Display name | Rajendran Fruit & Flower | Rajendran Sellers |
+| Display name | Buyer | Seller |
 | EAS project | `@mkencom/buyer-app` | `@mkencom/admin-app` |
 | EAS project id | `19acf35d-c07b-4175-b8da-de7ca354f9c5` | `77dc3e89-717f-45df-ad4e-818b13d7c57a` |
 | Keystore (EAS) | `egmE8q4QDu` (default) | generated on first build |
@@ -290,7 +290,7 @@ Or use the **Download** button on the build's page at expo.dev.
 
 | Field | buyer-app | admin-app |
 |---|---|---|
-| App name | Rajendran Fruit & Flower | Rajendran Sellers |
+| App name | Buyer | Seller |
 | Default language | English (India) | English (India) |
 | App or game | App | App |
 | Free or paid | Free | Free |

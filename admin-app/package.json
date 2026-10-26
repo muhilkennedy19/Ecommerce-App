@@ -8,6 +8,7 @@
     "@react-native-community/datetimepicker": "9.2.1",
     "@react-native-google-signin/google-signin": "^16.1.5",
     "expo": "~58.0.14",
+    "expo-camera": "~58.0.12",
     "expo-clipboard": "~58.0.3",
     "expo-constants": "~58.0.12",
     "expo-device": "~58.0.5",

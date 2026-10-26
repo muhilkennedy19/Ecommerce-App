@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Rajendran Sellers",
+    "name": "Seller",
     "slug": "admin-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -44,6 +44,13 @@
           "sounds": [
             "./assets/sounds/order_ring.wav"
           ]
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow the app to use the camera to scan product barcodes.",
+          "barcodeScannerEnabled": true
         }
       ]
     ],
