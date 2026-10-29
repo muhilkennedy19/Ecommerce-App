@@ -44,6 +44,10 @@ export default function TabsLayout() {
         options={{ title: t('tabs.orders', 'Orders'), tabBarLabel: t('tabs.orders', 'Orders'), tabBarIcon: tabEmoji('🧾') }}
       />
       <Tabs.Screen
+        name="contact"
+        options={{ title: t('tabs.contact', 'Contact'), tabBarLabel: t('tabs.contact', 'Contact'), tabBarIcon: tabEmoji('☎️') }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{ title: t('tabs.profile', 'Profile'), tabBarLabel: t('tabs.profile', 'Profile'), tabBarIcon: tabEmoji('👤') }}
       />

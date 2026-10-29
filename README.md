@@ -128,16 +128,27 @@ The same permission keys are enforced in the UI (`common/src/roles`) and in
 ## Features
 
 **Admin:** Google sign-in · role-gated dashboard · categories & products (image upload,
-perishable flag, optional expiry, stock with skip-tracking flag, on-demand prep time) ·
-in-app **daily price/stock reminders** · employee onboarding (details + photo + proof doc;
-onboarding token) · customer view/edit · **live incoming orders** with accept/serve ·
-analytics (date/product filters, revenue chart, order history) with **PDF & Excel export** ·
-settings (shop, operating hours, sale discount, Fast2SMS key).
+perishable flag, optional expiry, stock with skip-tracking flag, on-demand prep time,
+**barcode-scan inventory** with an on-screen target box) · in-app **daily price/stock
+reminders** · employee onboarding (details + photo + proof doc; onboarding token) ·
+**customer view/edit + insights** (lifetime spend, order count, last order, top-spender sort) ·
+**live incoming orders** with accept/serve · **POS** (in-store sales + printable bill) ·
+coupons · analytics (date/product filters, revenue chart, order history) with **PDF & Excel
+export** · **broadcast announcements** (compose a message/image + optional linked product,
+pushed to all buyers) · **Feedback** screen (product reviews + delivery ratings; admin/superuser
+only) · settings (shop, operating hours, sale discount, delivery zones, UPI, **subscription
+minimum**, Fast2SMS key).
 
 **Buyer:** Google sign-in · browse categories/products with relative expiry ("use by ~2
-days"), on-demand prep time, and stock/availability · **"not accepting orders" banner**
-outside the shop's operating hours · cart & checkout (optional Fast2SMS phone verification) ·
-order history with live status.
+days"), on-demand prep time, stock/availability, and **average star rating in the list** ·
+**"not accepting orders" banner** outside the shop's operating hours · **persistent cart** ·
+checkout (delivery zones, coupons, COD/UPI) · **order history** with live status, **reorder**,
+and **buyer cancel while still `new`** · **product subscriptions** — turn the cart into a
+standing/scheduled order (one-time or daily/weekly, COD-only, free delivery, gated by the
+admin's minimum) materialized into real orders by a cron · **ratings & reviews** (rate the
+products *and* the delivery of a served order; reviews shown on the product page) ·
+**announcement card** on Home · profile (addresses, phone, language, manage subscriptions,
+sign out).
 
 ## Security
 
@@ -152,8 +163,10 @@ Read this before going beyond a prototype.
   none. No app rewrite.
 - **OTP is dev-grade.** Codes are stored short-lived in Firestore with an expiry + attempt cap.
   For production, move generation/verification server-side.
-- **Email/onboarding mail is stubbed** (Spark can't send mail without a server). The employee
-  onboarding "email" currently surfaces a token in-app; wire a server/email provider later.
+- **Reviews are verified client-side.** Buyers rate products from their own past orders, and
+  Security Rules pin each review to the writer's uid at the deterministic id `${productId}_${uid}`
+  (one per buyer per product, 1–5 rating). A direct-write bypassing the app can still forge the
+  display name; harden server-side if that matters.
 
 ## Known limitations / upgrade paths
 
@@ -161,10 +174,17 @@ Read this before going beyond a prototype.
   before upload, but Firestore caps a document at 1 MB — very large images are rejected with a
   clear error. If you later outgrow this, flip to Cloud Storage (Blaze) or a free file host and
   swap the `putImage`/`useCachedImage` pair; nothing else changes.
-- **Push notifications:** order alerts are in-app (real-time listeners) while the app is open.
-  Background/scheduled push needs **FCM + a server/function** (Blaze) — documented, not built.
+- **Push + email are built via a free Cloudflare Worker** (`functions/notify`, FCM HTTP v1 +
+  Gmail API) — so the Firebase project stays on **Spark** with no Cloud Functions. The Worker
+  handles `new-order` (rings order-servers), `order-status`, `back-in-stock`, `broadcast`
+  (announcements → all buyers), and `email`; a **per-minute cron** re-rings stale unpicked
+  orders and **materializes due product subscriptions into orders**. It needs a one-time
+  `wrangler deploy`. In-app real-time listeners still cover live updates while an app is open.
+- **UPI is not auto-charged**, so **subscriptions are Cash-on-Delivery only** (the buyer is told
+  this before subscribing).
 - **Operating-hours timezone:** comparisons use device local time; the stored timezone is
-  informational.
+  informational. Subscription fire times are stored as absolute timestamps computed on-device,
+  so the Worker needs no timezone math.
 - **Single shop** (`shopId: "main"`); the data model carries `shopId` so multi-shop is a
   smaller step later.
 - iOS: configs are Android-first; add `ios` bundle IDs + `GoogleService-Info.plist` to extend.

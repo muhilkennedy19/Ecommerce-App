@@ -14,6 +14,7 @@ import {
   serverTimestamp,
   setDoc,
   startAfter,
+  Timestamp,
   updateDoc,
   where,
   writeBatch,
@@ -25,11 +26,13 @@ import {
 import { getDb } from '../firebase/client';
 import type {
   Address,
+  Announcement,
   AppUser,
   Category,
   Coupon,
   Customer,
   DeliveryZone,
+  DeliveryFeedback,
   Employee,
   Order,
   OrderChange,
@@ -39,8 +42,10 @@ import type {
   PendingUser,
   Product,
   PushToken,
+  Review,
   Role,
   Shop,
+  Subscription,
 } from '../types';
 import { DEFAULT_OPERATING_HOURS } from '../util/time';
 
@@ -498,6 +503,31 @@ export async function markOrderPaymentClaimed(id: string, upiRef?: string): Prom
   });
 }
 
+/**
+ * Buyer cancels their own order while it is still `new` (before the shop accepts).
+ * No stock restock is needed because stock is only applied on accept. Security Rules
+ * restrict this to the owner, a `new`→`cancelled` transition, and an unchanged total.
+ */
+export async function buyerCancelOrder(
+  id: string,
+  actor?: { uid: string; name?: string | null; atMs?: number },
+): Promise<void> {
+  await updateDoc(doc(getDb(), 'orders', id), {
+    status: 'cancelled',
+    ...(actor
+      ? {
+          statusLog: arrayUnion({
+            at: actor.atMs ?? Date.now(),
+            by: actor.uid,
+            byName: actor.name ?? null,
+            status: 'cancelled',
+          }),
+        }
+      : {}),
+    updatedAt: serverTimestamp(),
+  });
+}
+
 /** Shopkeeper confirms the payment landed in their UPI/bank account. */
 export async function setOrderPaymentVerified(id: string): Promise<void> {
   await updateDoc(doc(getDb(), 'orders', id), {
@@ -589,6 +619,165 @@ export async function upsertCoupon(coupon: Coupon): Promise<void> {
 
 export async function deleteCoupon(code: string): Promise<void> {
   await deleteDoc(doc(getDb(), 'coupons', code.trim().toUpperCase()));
+}
+
+// -------------------------------------------------------------------------- Reviews
+export function subscribeProductReviews(productId: string, cb: (r: Review[]) => void): Unsubscribe {
+  const q = query(
+    collection(getDb(), 'reviews'),
+    where('productId', '==', productId),
+    orderBy('createdAt', 'desc'),
+  );
+  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => withId<Review>(d.id, d.data()))));
+}
+
+/** All reviews for a shop — lets the buyer catalog show per-product average ratings.
+ *  Single equality filter, so no composite index is required. */
+export function subscribeShopReviews(shopId: string, cb: (r: Review[]) => void): Unsubscribe {
+  const q = query(collection(getDb(), 'reviews'), where('shopId', '==', shopId));
+  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => withId<Review>(d.id, d.data()))));
+}
+
+/** Create or edit the signed-in buyer's review for a product (doc id = `${productId}_${uid}`). */
+export async function upsertReview(input: {
+  productId: string;
+  shopId: string;
+  uid: string;
+  customerName?: string | null;
+  rating: number;
+  text?: string | null;
+}): Promise<void> {
+  const id = `${input.productId}_${input.uid}`;
+  const ref = doc(getDb(), 'reviews', id);
+  const existing = await getDoc(ref);
+  await setDoc(
+    ref,
+    {
+      productId: input.productId,
+      shopId: input.shopId,
+      uid: input.uid,
+      customerName: input.customerName ?? null,
+      rating: input.rating,
+      text: input.text?.trim() || null,
+      createdAt: existing.exists() ? existing.data()?.createdAt ?? serverTimestamp() : serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+export async function deleteReview(id: string): Promise<void> {
+  await deleteDoc(doc(getDb(), 'reviews', id));
+}
+
+// ----------------------------------------------------------------- Delivery feedback
+/** A buyer rates the delivery of one of their served orders (doc id = orderId). */
+export async function upsertDeliveryFeedback(input: {
+  orderId: string;
+  shopId: string;
+  uid: string;
+  customerName?: string | null;
+  rating: number;
+  text?: string | null;
+}): Promise<void> {
+  const ref = doc(getDb(), 'deliveryFeedback', input.orderId);
+  const existing = await getDoc(ref);
+  await setDoc(
+    ref,
+    {
+      orderId: input.orderId,
+      shopId: input.shopId,
+      uid: input.uid,
+      customerName: input.customerName ?? null,
+      rating: input.rating,
+      text: input.text?.trim() || null,
+      createdAt: existing.exists() ? existing.data()?.createdAt ?? serverTimestamp() : serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+/** All delivery feedback for a shop (admin feedback screen). */
+export function subscribeDeliveryFeedback(
+  shopId: string,
+  cb: (f: DeliveryFeedback[]) => void,
+): Unsubscribe {
+  const q = query(collection(getDb(), 'deliveryFeedback'), where('shopId', '==', shopId));
+  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => withId<DeliveryFeedback>(d.id, d.data()))));
+}
+
+// --------------------------------------------------------------------- Subscriptions
+/** Create a product subscription. `nextRun` is the first fire time, computed on the device. */
+export async function addSubscription(
+  input: Omit<Subscription, 'id' | 'nextRunAt' | 'lastRunAt' | 'createdAt'>,
+  nextRun: Date,
+): Promise<string> {
+  const r = await addDoc(collection(getDb(), 'subscriptions'), {
+    ...input,
+    nextRunAt: Timestamp.fromDate(nextRun),
+    lastRunAt: null,
+    createdAt: serverTimestamp(),
+  });
+  return r.id;
+}
+
+export function subscribeMySubscriptions(
+  customerId: string,
+  cb: (s: Subscription[]) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getDb(), 'subscriptions'),
+    where('customerId', '==', customerId),
+    orderBy('createdAt', 'desc'),
+  );
+  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => withId<Subscription>(d.id, d.data()))));
+}
+
+/** Pause/resume a subscription. When resuming, pass a fresh `nextRun` so a stale past time
+ *  doesn't make the Worker fire it immediately. */
+export async function setSubscriptionActive(
+  id: string,
+  active: boolean,
+  nextRun?: Date,
+): Promise<void> {
+  await updateDoc(doc(getDb(), 'subscriptions', id), {
+    active,
+    ...(nextRun ? { nextRunAt: Timestamp.fromDate(nextRun) } : {}),
+  } as UpdateData<Subscription>);
+}
+
+export async function deleteSubscription(id: string): Promise<void> {
+  await deleteDoc(doc(getDb(), 'subscriptions', id));
+}
+
+// -------------------------------------------------------------------- Announcements
+/** Active announcements for a shop (buyer Home card). */
+export function subscribeAnnouncements(shopId: string, cb: (a: Announcement[]) => void): Unsubscribe {
+  const q = query(
+    collection(getDb(), 'announcements'),
+    where('shopId', '==', shopId),
+    where('active', '==', true),
+  );
+  return onSnapshot(q, (snap) => cb(snap.docs.map((d) => withId<Announcement>(d.id, d.data()))));
+}
+
+export async function addAnnouncement(
+  input: Omit<Announcement, 'id' | 'createdAt'>,
+): Promise<string> {
+  const r = await addDoc(collection(getDb(), 'announcements'), {
+    ...input,
+    createdAt: serverTimestamp(),
+  });
+  return r.id;
+}
+
+export async function setAnnouncementActive(id: string, active: boolean): Promise<void> {
+  await updateDoc(doc(getDb(), 'announcements', id), { active });
+}
+
+export async function deleteAnnouncement(id: string): Promise<void> {
+  await deleteDoc(doc(getDb(), 'announcements', id));
 }
 
 // ---------------------------------------------------------------------- Push tokens

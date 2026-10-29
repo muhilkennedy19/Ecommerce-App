@@ -40,6 +40,7 @@ const SECTIONS: Section[] = [
   { href: '/customers', titleKey: 'dash.customers', title: 'Customers', subKey: 'dash.customers.sub', subtitle: 'View & edit', perm: 'customers.read', emoji: '🧾' },
   { href: '/analytics', titleKey: 'dash.analytics', title: 'Analytics', subKey: 'dash.analytics.sub', subtitle: 'Trends & export', perm: 'analytics.read', emoji: '📈' },
   { href: '/settings', titleKey: 'dash.settings', title: 'Settings', subKey: 'dash.settings.sub', subtitle: 'Shop, hours, keys', perm: 'shop.config', emoji: '⚙️' },
+  { href: '/feedback', titleKey: 'dash.feedback', title: 'Feedback', subKey: 'dash.feedback.sub', subtitle: 'Reviews & ratings', perm: 'shop.config', emoji: '⭐' },
   { href: '/roles', titleKey: 'dash.roles', title: 'Team & Roles', subKey: 'dash.roles.sub', subtitle: 'Assign roles', perm: 'roles.manage', emoji: '🧑‍💼' },
   { href: '/coupons', titleKey: 'dash.coupons', title: 'Coupons', subKey: 'dash.coupons.sub', subtitle: 'Discounts & offers', perm: 'sales.discount', emoji: '🏷️' },
 ];

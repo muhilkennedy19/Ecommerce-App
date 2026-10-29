@@ -1,4 +1,5 @@
 import {
+  buyerCancelOrder,
   fetchCustomerOrdersPage,
   ORDER_STATUS_LABELS,
   PAYMENT_MODE_LABELS,
@@ -7,14 +8,17 @@ import {
   type OrderStatus,
   type PaymentStatus,
 } from '@common';
-import { Tabs } from 'expo-router';
+import { router, Tabs } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 
-import { Badge, Card, DANGER, EmptyState, Loader, PRIMARY, Screen, SUCCESS } from '@/components/kit';
+import { useConfirm, useToast } from '@/components/feedback';
+import { Badge, Button, Card, DANGER, EmptyState, Loader, PRIMARY, Screen, SUCCESS } from '@/components/kit';
+import { OrderReview } from '@/components/order-review';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
+import { useCart } from '@/lib/cart';
 import { useT } from '@/lib/i18n';
 
 const money = (n: number) => `₹${n.toFixed(2)}`;
@@ -40,12 +44,56 @@ const PAYMENT_STATUS_COLOR: Record<PaymentStatus, string> = {
 export default function Orders() {
   const { user } = useAuth();
   const t = useT();
+  const cart = useCart();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [cursor, setCursor] = useState<Cursor>(undefined);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [firstLoaded, setFirstLoaded] = useState(false);
+
+  const reorder = useCallback(
+    (o: Order) => {
+      o.items.forEach((i) =>
+        cart.add({ productId: i.productId, name: i.name, price: i.price, qty: i.qty, unit: i.unit }),
+      );
+      toast({
+        type: 'success',
+        title: t('orders.reordered', 'Added to cart'),
+        message: t('orders.reorderedHint', 'Review your cart and check out.'),
+      });
+      router.push('/checkout');
+    },
+    [cart, toast, t],
+  );
+
+  const cancel = useCallback(
+    async (o: Order) => {
+      if (!user) return;
+      const ok = await confirm({
+        title: t('orders.cancelTitle', 'Cancel order?'),
+        message: t('orders.cancelConfirm', 'This order will be cancelled. This cannot be undone.'),
+        confirmText: t('orders.cancelConfirmBtn', 'Cancel order'),
+        cancelText: t('orders.keepBtn', 'Keep'),
+        destructive: true,
+      });
+      if (!ok) return;
+      try {
+        await buyerCancelOrder(o.id, { uid: user.uid, name: user.displayName ?? null });
+        // Paginated list (not a live subscription) — update the row in place.
+        setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, status: 'cancelled' } : x)));
+      } catch {
+        toast({
+          type: 'error',
+          title: t('orders.cancelFailed', 'Could not cancel'),
+          message: t('common.tryAgain', 'Please try again.'),
+        });
+      }
+    },
+    [user, confirm, toast, t],
+  );
 
   const loadFirst = useCallback(async () => {
     if (!user) return;
@@ -136,9 +184,26 @@ export default function Orders() {
             {deltaMsg}
           </ThemedText>
         ) : null}
+        <View style={styles.actions}>
+          <Button
+            title={t('orders.reorder', 'Reorder')}
+            variant="secondary"
+            size="sm"
+            onPress={() => reorder(o)}
+          />
+          {o.status === 'new' ? (
+            <Button
+              title={t('orders.cancel', 'Cancel')}
+              variant="danger"
+              size="sm"
+              onPress={() => void cancel(o)}
+            />
+          ) : null}
+        </View>
+        {o.status === 'served' ? <OrderReview order={o} user={user} /> : null}
       </Card>
     );
-  }, [t]);
+  }, [t, reorder, cancel, user]);
 
   return (
     <Screen scroll={false}>
@@ -177,5 +242,6 @@ export default function Orders() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  actions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.one },
   listContent: { gap: Spacing.three, paddingBottom: Spacing.six },
 });

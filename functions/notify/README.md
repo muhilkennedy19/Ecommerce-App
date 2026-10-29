@@ -27,7 +27,20 @@ Body is one of:
 | `new-order`      | `shopId`, `orderId`                     | order-servers only: `pushTokens/*` with `kind == 'admin'` **and** `role` in `sales` / `admin` / `superuser` (tokens with no `role` or any other value are excluded) — high-priority `orders` channel, `order-ring` sound, so their phone rings. Title **New order**, body *A new order just came in — tap to view*. |
 | `order-status`   | `customerId`, `status`, `orderId?`      | `pushTokens/{customerId}`. Title **Order update**, body *Your order is now `${status}`*. Default channel/sound. |
 | `back-in-stock`  | `shopId`, `productId`, `productName?`   | every customer with `productId` in their `customers/{uid}.notifyBackInStock` array → each of their `pushTokens/{uid}`. Title **Back in stock**, body *`${productName \|\| 'An item'}` is back in stock*. Default channel/sound. |
+| `broadcast`      | `shopId`, `title`, `body`, `productId?` | every buyer: `pushTokens/*` with `kind == 'buyer'` that hasn't opted out. Shop announcement — title/body come from the request; the optional `productId` rides in the FCM `data` so tapping the notification deep-links to that product. Default channel/sound. |
 | `email`          | `to`, `subject`, `text`, `html?`        | sends a real email via the **Gmail API** (not a push). See [Email event](#email-event-gmail-api) below. |
+
+### Scheduled sweep (cron)
+
+A per-minute Cloudflare cron trigger (`wrangler.toml [triggers]`) runs the `scheduled()`
+handler, which does two independent sweeps each tick:
+
+- **Stale-order re-ring** — re-notifies order-servers about `orders` still in `status == 'new'`
+  past a ~30s threshold, up to a per-order cap, until the order is picked up.
+- **Subscription materialization** — finds `subscriptions` that are `active` with `nextRunAt <= now`,
+  creates a real `new` order from each (items/address snapshot copied from the subscription;
+  **free delivery**; idempotent via a deterministic order id), rings order-servers, then advances
+  the schedule (one-time → deactivates; recurring → rolls `nextRunAt` forward by a day/week).
 
 Response is always JSON:
 

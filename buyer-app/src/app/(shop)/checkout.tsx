@@ -39,6 +39,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { useToast } from '@/components/feedback';
+import { CartSubscribe } from '@/components/cart-subscribe';
 import { LocationPicker, type LatLng } from '@/components/location-picker';
 import { Badge, Button, Card, DANGER, EmptyState, PRIMARY, Screen, SectionTitle, SUCCESS, TextField } from '@/components/kit';
 import { ThemedText } from '@/components/themed-text';
@@ -884,6 +885,27 @@ export default function Checkout() {
         )}
       </Card>
       */}
+
+      <CartSubscribe
+        items={cart.lines.map((l) => ({ productId: l.productId, name: l.name, price: l.price, qty: l.qty, unit: l.unit ?? null }))}
+        subtotal={subtotal}
+        minOrder={shop?.subscriptionMinOrder ?? 0}
+        address={
+          selectedAddress
+            ? {
+                ...selectedAddress,
+                lat: selectedCoords?.lat ?? selectedAddress.lat ?? null,
+                lng: selectedCoords?.lng ?? selectedAddress.lng ?? null,
+              }
+            : null
+        }
+        user={user}
+        customer={customer}
+        onCreated={() => {
+          cart.clear();
+          router.replace('/subscriptions');
+        }}
+      />
 
       <Button
         title={

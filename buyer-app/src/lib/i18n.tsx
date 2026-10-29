@@ -51,6 +51,7 @@ const en: Record<string, string> = {
   // tabs
   'tabs.shop': 'Shop',
   'tabs.orders': 'Orders',
+  'tabs.contact': 'Contact',
   'tabs.profile': 'Profile',
 
   // sign-in
@@ -119,6 +120,17 @@ const en: Record<string, string> = {
   'profile.saveAddresses': 'Save addresses',
   'profile.addressesSaved': 'Your addresses have been updated.',
   'profile.language': 'Language',
+
+  // contact us
+  'contact.title': 'Contact us',
+  'contact.location': 'Where to find us',
+  'contact.getDirections': 'Get directions',
+  'contact.reachUs': 'Reach us',
+  'contact.phone': 'Phone',
+  'contact.email': 'Email',
+  'contact.empty': 'No contact details yet',
+  'contact.emptyHint': 'The shop has not added its contact information yet.',
+  'contact.couldNotOpen': 'Could not open',
 
   // product detail
   'product.title': 'Product',
@@ -238,6 +250,7 @@ const ta: Record<string, string> = {
 
   'tabs.shop': 'கடை',
   'tabs.orders': 'ஆர்டர்கள்',
+  'tabs.contact': 'தொடர்பு',
   'tabs.profile': 'சுயவிவரம்',
 
   'signin.brand': 'கடை',
@@ -302,6 +315,17 @@ const ta: Record<string, string> = {
   'profile.saveAddresses': 'முகவரிகளைச் சேமி',
   'profile.addressesSaved': 'உங்கள் முகவரிகள் புதுப்பிக்கப்பட்டன.',
   'profile.language': 'மொழி',
+
+  // contact us
+  'contact.title': 'எங்களை தொடர்பு கொள்ள',
+  'contact.location': 'எங்களை எங்கே காணலாம்',
+  'contact.getDirections': 'வழிகளைப் பெறு',
+  'contact.reachUs': 'எங்களைத் தொடர்புகொள்ள',
+  'contact.phone': 'தொலைபேசி',
+  'contact.email': 'மின்னஞ்சல்',
+  'contact.empty': 'இன்னும் தொடர்பு விவரங்கள் இல்லை',
+  'contact.emptyHint': 'கடை இன்னும் அதன் தொடர்பு விவரங்களைச் சேர்க்கவில்லை.',
+  'contact.couldNotOpen': 'திறக்க முடியவில்லை',
 
   'product.title': 'தயாரிப்பு',
   'product.notFound': 'தயாரிப்பு கிடைக்கவில்லை',
@@ -416,6 +440,7 @@ const hi: Record<string, string> = {
 
   'tabs.shop': 'दुकान',
   'tabs.orders': 'ऑर्डर',
+  'tabs.contact': 'संपर्क',
   'tabs.profile': 'प्रोफ़ाइल',
 
   'signin.brand': 'दुकान',
@@ -480,6 +505,17 @@ const hi: Record<string, string> = {
   'profile.saveAddresses': 'पते सहेजें',
   'profile.addressesSaved': 'आपके पते अपडेट कर दिए गए हैं।',
   'profile.language': 'भाषा',
+
+  // contact us
+  'contact.title': 'संपर्क करें',
+  'contact.location': 'हमें कहाँ पाएं',
+  'contact.getDirections': 'दिशा-निर्देश पाएं',
+  'contact.reachUs': 'हमसे संपर्क करें',
+  'contact.phone': 'फ़ोन',
+  'contact.email': 'ईमेल',
+  'contact.empty': 'अभी तक कोई संपर्क विवरण नहीं',
+  'contact.emptyHint': 'दुकान ने अभी तक अपनी संपर्क जानकारी नहीं जोड़ी है।',
+  'contact.couldNotOpen': 'खोला नहीं जा सका',
 
   'product.title': 'उत्पाद',
   'product.notFound': 'उत्पाद नहीं मिला',
@@ -594,6 +630,7 @@ const kn: Record<string, string> = {
 
   'tabs.shop': 'ಅಂಗಡಿ',
   'tabs.orders': 'ಆರ್ಡರ್‌ಗಳು',
+  'tabs.contact': 'ಸಂಪರ್ಕ',
   'tabs.profile': 'ಪ್ರೊಫೈಲ್',
 
   'signin.brand': 'ಅಂಗಡಿ',
@@ -658,6 +695,17 @@ const kn: Record<string, string> = {
   'profile.saveAddresses': 'ವಿಳಾಸಗಳನ್ನು ಉಳಿಸಿ',
   'profile.addressesSaved': 'ನಿಮ್ಮ ವಿಳಾಸಗಳನ್ನು ನವೀಕರಿಸಲಾಗಿದೆ.',
   'profile.language': 'ಭಾಷೆ',
+
+  // contact us
+  'contact.title': 'ನಮ್ಮನ್ನು ಸಂಪರ್ಕಿಸಿ',
+  'contact.location': 'ನಮ್ಮನ್ನು ಎಲ್ಲಿ ಕಾಣಬಹುದು',
+  'contact.getDirections': 'ಮಾರ್ಗಗಳನ್ನು ಪಡೆಯಿರಿ',
+  'contact.reachUs': 'ನಮ್ಮನ್ನು ಸಂಪರ್ಕಿಸಿ',
+  'contact.phone': 'ದೂರವಾಣಿ',
+  'contact.email': 'ಇಮೇಲ್',
+  'contact.empty': 'ಇನ್ನೂ ಸಂಪರ್ಕ ವಿವರಗಳಿಲ್ಲ',
+  'contact.emptyHint': 'ಅಂಗಡಿ ಇನ್ನೂ ತನ್ನ ಸಂಪರ್ಕ ಮಾಹಿತಿಯನ್ನು ಸೇರಿಸಿಲ್ಲ.',
+  'contact.couldNotOpen': 'ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ',
 
   'product.title': 'ಉತ್ಪನ್ನ',
   'product.notFound': 'ಉತ್ಪನ್ನ ಕಂಡುಬಂದಿಲ್ಲ',

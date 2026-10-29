@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Badge, Button, DANGER, EmptyState, PRIMARY, Screen } from '@/components/kit';
+import { ProductReviews } from '@/components/product-reviews';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useCachedImage } from '@/hooks/use-cached-image';
@@ -57,12 +58,11 @@ export default function ProductDetail() {
   const uri = useCachedImage(product?.imageId);
 
   const productId = product?.id;
-  const isOutOfStock = !!product && product.trackStock && (product.stock ?? 0) <= 0;
 
-  // Load the buyer's customer doc only when the product is out of stock, so we can show and
-  // toggle the "notify me when back in stock" watch for this product.
+  // Load the buyer's customer doc whenever signed in — the subscribe block needs their saved
+  // address/phone, and the out-of-stock watch toggle needs their back-in-stock list.
   useEffect(() => {
-    if (!user || !isOutOfStock || !productId) {
+    if (!user || !productId) {
       setCustomer(null);
       setWatching(false);
       return;
@@ -78,7 +78,7 @@ export default function ProductDetail() {
     return () => {
       active = false;
     };
-  }, [user, isOutOfStock, productId]);
+  }, [user, productId]);
 
   const toggleWatch = async () => {
     if (!customer || !productId) return;
@@ -188,8 +188,10 @@ export default function ProductDetail() {
       <Button
         title={t('common.addToCart', 'Add to cart')}
         disabled={!canAdd}
-        onPress={() => cart.add({ productId: product.id, name: product.name, price })}
+        onPress={() => cart.add({ productId: product.id, name: product.name, price, unit: product.unit })}
       />
+
+      <ProductReviews productId={product.id} />
     </Screen>
   );
 }

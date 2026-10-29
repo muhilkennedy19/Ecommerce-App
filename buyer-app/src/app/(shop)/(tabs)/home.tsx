@@ -5,13 +5,18 @@ import {
   formatUnitPrice,
   fuzzyFilter,
   shopAcceptsOrders,
+  subscribeAnnouncements,
   subscribeCategories,
   subscribeProducts,
   subscribeShop,
+  subscribeShopReviews,
+  type Announcement,
   type Category,
   type Product,
+  type Review,
   type Shop,
 } from '@common';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { router, Tabs } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -19,15 +24,17 @@ import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Badge, Button, Card, DANGER, EmptyState, Loader, PRIMARY, SectionTitle, TextField } from '@/components/kit';
+import { OccasionLogo } from '@/components/occasion-logo';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useCachedImage } from '@/hooks/use-cached-image';
-import { useShopName, useShopLogo } from '@/hooks/use-shop-name';
+import { useShopName, useShopLogo, useShopIconEffect } from '@/hooks/use-shop-name';
 import { useTheme } from '@/hooks/use-theme';
 import { useCart } from '@/lib/cart';
 import { shopId } from '@/lib/config';
 import { useT } from '@/lib/i18n';
 const money = (n: number) => `₹${n.toFixed(2)}`;
+const RATING_GOLD = '#F5A623';
 
 const openDetail = (id: string) => router.push(('/product/' + id) as never);
 
@@ -39,6 +46,9 @@ export default function Home() {
   const [shop, setShop] = useState<Shop | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -58,6 +68,21 @@ export default function Home() {
 
   useEffect(() => subscribeShop(shopId, setShop), []);
   useEffect(() => subscribeCategories(shopId, setCategories), []);
+  useEffect(() => subscribeShopReviews(shopId, setReviews), []);
+  useEffect(() => subscribeAnnouncements(shopId, setAnnouncements), []);
+  useEffect(() => {
+    AsyncStorage.getItem('dismissedAnnouncements')
+      .then((raw) => {
+        if (!raw) return;
+        try {
+          const ids = JSON.parse(raw);
+          if (Array.isArray(ids)) setDismissed((cur) => Array.from(new Set([...cur, ...ids])));
+        } catch {
+          // ignore a corrupt blob
+        }
+      })
+      .catch(() => {});
+  }, []);
   useEffect(
     () =>
       subscribeProducts(shopId, (p) => {
@@ -70,8 +95,33 @@ export default function Home() {
   const open = shopAcceptsOrders(shop);
   // Admin-uploaded shop logo (data: URI, same source as the splash) shown in the header.
   const logoUri = useShopLogo();
+  const iconEffect = useShopIconEffect();
 
   const featured = useMemo(() => products.filter((p) => p.active && p.featured), [products]);
+
+  // Per-product average rating + count, grouped from the shop's reviews (client-side).
+  const ratings = useMemo(() => {
+    const acc = new Map<string, { sum: number; count: number }>();
+    for (const r of reviews) {
+      const cur = acc.get(r.productId) ?? { sum: 0, count: 0 };
+      acc.set(r.productId, { sum: cur.sum + r.rating, count: cur.count + 1 });
+    }
+    const out = new Map<string, { avg: number; count: number }>();
+    acc.forEach((v, k) => out.set(k, { avg: v.sum / v.count, count: v.count }));
+    return out;
+  }, [reviews]);
+
+  const visibleAnnouncements = useMemo(
+    () => announcements.filter((a) => !dismissed.includes(a.id)),
+    [announcements, dismissed],
+  );
+
+  const dismissAnnouncement = (id: string) =>
+    setDismissed((prev) => {
+      const next = [...prev, id];
+      AsyncStorage.setItem('dismissedAnnouncements', JSON.stringify(next)).catch(() => {});
+      return next;
+    });
 
   const byCategory = useMemo(
     () =>
@@ -106,12 +156,8 @@ export default function Home() {
           headerTitleAlign: 'left',
           headerTitle: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
-              {logoUri ? (
-                <Image
-                  source={{ uri: logoUri }}
-                  style={{ width: 30, height: 30, borderRadius: 6 }}
-                  contentFit="contain"
-                />
+              {logoUri || iconEffect !== 'none' ? (
+                <OccasionLogo logoUri={logoUri} size={30} effect={iconEffect} borderRadius={6} />
               ) : null}
               <ThemedText style={{ fontWeight: '700', fontSize: 18 }} numberOfLines={1}>
                 {shopName}
@@ -134,6 +180,7 @@ export default function Home() {
               <ProductCard
                 product={item}
                 canAdd={open}
+                rating={ratings.get(item.id)}
                 onOpen={() => openDetail(item.id)}
                 onAdd={() => cart.add({ productId: item.id, name: item.name, price: effectivePrice(item), unit: item.unit })}
               />
@@ -144,6 +191,15 @@ export default function Home() {
             windowSize={11}
             ListHeaderComponent={
               <View style={{ gap: Spacing.three }}>
+                {visibleAnnouncements.map((a) => (
+                  <AnnouncementCard
+                    key={a.id}
+                    announcement={a}
+                    onOpen={a.productId ? () => openDetail(a.productId as string) : undefined}
+                    onDismiss={() => dismissAnnouncement(a.id)}
+                  />
+                ))}
+
                 {shop != null && !open ? (
                   <Card style={{ backgroundColor: DANGER + '22' }}>
                     <ThemedText type="smallBold" style={{ color: DANGER }}>
@@ -295,14 +351,62 @@ function Pill({ label, active, onPress }: { label: string; active: boolean; onPr
   );
 }
 
+/** A dismissible shop announcement shown at the top of Home. */
+function AnnouncementCard({
+  announcement,
+  onOpen,
+  onDismiss,
+}: {
+  announcement: Announcement;
+  onOpen?: () => void;
+  onDismiss: () => void;
+}) {
+  const t = useT();
+  const theme = useTheme();
+  const uri = useCachedImage(announcement.imageId);
+  return (
+    <Card style={{ gap: Spacing.two, borderLeftWidth: 4, borderLeftColor: PRIMARY }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two }}>
+        <ThemedText type="smallBold" style={{ flex: 1 }}>
+          {announcement.title}
+        </ThemedText>
+        <Pressable onPress={onDismiss} hitSlop={8} accessibilityLabel={t('common.dismiss', 'Dismiss')}>
+          <ThemedText type="small" themeColor="textSecondary">
+            ✕
+          </ThemedText>
+        </Pressable>
+      </View>
+      {uri ? (
+        <Image
+          source={{ uri }}
+          style={{ width: '100%', height: 150, borderRadius: Spacing.two, backgroundColor: theme.backgroundSelected }}
+          contentFit="cover"
+        />
+      ) : null}
+      {announcement.body ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          {announcement.body}
+        </ThemedText>
+      ) : null}
+      {onOpen ? (
+        <View style={{ alignSelf: 'flex-start' }}>
+          <Button title={t('home.viewProduct', 'View product')} variant="secondary" size="sm" onPress={onOpen} />
+        </View>
+      ) : null}
+    </Card>
+  );
+}
+
 function ProductCard({
   product,
   canAdd,
+  rating,
   onAdd,
   onOpen,
 }: {
   product: Product;
   canAdd: boolean;
+  rating?: { avg: number; count: number };
   onAdd: () => void;
   onOpen: () => void;
 }) {
@@ -354,6 +458,16 @@ function ProductCard({
           )}
         </View>
       </View>
+      {rating ? (
+        <View style={styles.ratingPill}>
+          <ThemedText type="small" style={{ color: RATING_GOLD, fontWeight: '700' }}>
+            ★ {rating.avg.toFixed(1)}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            ({rating.count})
+          </ThemedText>
+        </View>
+      ) : null}
     </Card>
   );
 }
@@ -434,6 +548,7 @@ const styles = StyleSheet.create({
   featuredCard: { width: 160, gap: Spacing.one },
   featuredImage: { width: '100%', height: 136, borderRadius: Spacing.two },
   productCard: { flexDirection: 'row', gap: Spacing.three },
+  ratingPill: { alignItems: 'flex-end', gap: 2, marginLeft: Spacing.one },
   productImage: { width: 88, height: 88, borderRadius: Spacing.two },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   // Featured cards are only 160px wide, so the price + struck original must wrap

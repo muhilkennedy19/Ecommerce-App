@@ -1,6 +1,6 @@
-import { getImage, subscribeShop } from '@common';
+import { getImage, subscribeShop, type OccasionEffect } from '@common';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { shopId } from '@/lib/config';
 
@@ -9,6 +9,8 @@ const CACHE_KEY = 'shopName';
 export const LOGO_KEY = 'shopLogo';
 /** Image id the cached URI was built from, so we only refetch when it changes. */
 const LOGO_ID_KEY = 'shopLogoId';
+/** Admin-chosen festive overlay, cached so the pre-Firebase splash can render it. */
+export const ICON_EFFECT_KEY = 'shopIconEffect';
 const DEFAULT_NAME = 'Buyer';
 
 /**
@@ -62,6 +64,7 @@ export function useShopName(): string {
         AsyncStorage.setItem(CACHE_KEY, s.name).catch(() => {});
       }
       void syncLogo(s?.logoImageId ?? null);
+      AsyncStorage.setItem(ICON_EFFECT_KEY, s?.iconEffect ?? 'none').catch(() => {});
     });
 
     return () => {
@@ -102,4 +105,37 @@ export function useShopLogo(): string | null {
   }, []);
 
   return logo;
+}
+
+/**
+ * The admin-chosen festive overlay (`none` by default), resolved instantly from the cache and
+ * kept live via `subscribeShop`. Drives the overlay on the launch splash and home header.
+ */
+export function useShopIconEffect(): OccasionEffect {
+  const [effect, setEffect] = useState<OccasionEffect>('none');
+  // Once the live subscription has delivered a value, the (slower) initial cache read must
+  // not overwrite it — otherwise a warm snapshot that wins the race is clobbered by the
+  // stale cached value and persists until the next shop change.
+  const gotLive = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(ICON_EFFECT_KEY)
+      .then((v) => {
+        if (active && v && !gotLive.current) setEffect(v as OccasionEffect);
+      })
+      .catch(() => {});
+    const unsub = subscribeShop(shopId, (s) => {
+      const next = s?.iconEffect ?? 'none';
+      gotLive.current = true;
+      if (active) setEffect(next);
+      AsyncStorage.setItem(ICON_EFFECT_KEY, next).catch(() => {});
+    });
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, []);
+
+  return effect;
 }

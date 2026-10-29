@@ -104,7 +104,16 @@ service cloud.firestore {
       );
       allow read: if roleIn(['pos', 'sales', 'analytics', 'admin', 'superuser'])
         || (isSignedIn() && resource.data.customerId == request.auth.uid);
-      allow update: if roleIn(['pos', 'sales', 'superuser']);
+      allow update: if roleIn(['pos', 'sales', 'superuser'])
+        || (isSignedIn()
+          && resource.data.customerId == request.auth.uid
+          && resource.data.status == 'new'
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.customerId == resource.data.customerId
+          && request.resource.data.total == resource.data.total
+          && request.resource.data.grandTotal == resource.data.grandTotal
+          && request.resource.data.items == resource.data.items
+          && request.resource.data.get('paymentStatus', 'pending') == resource.data.get('paymentStatus', 'pending'));
       allow delete: if roleIn(['superuser']);
     }
 
@@ -112,6 +121,59 @@ service cloud.firestore {
     match /coupons/{code} {
       allow read: if isSignedIn();
       allow write: if roleIn(['admin', 'superuser']);
+    }
+
+    // ---- reviews (product ratings) ----
+    // Any signed-in user reads. A buyer writes ONLY their own review, at the deterministic
+    // id `${productId}_${uid}` (so one review per buyer per product — no ballot-stuffing),
+    // with a validated 1–5 integer rating. Updates require the existing doc to already be
+    // theirs (can't overwrite someone else's). Content managers may remove a review.
+    function validReview(id) {
+      return request.resource.data.uid == request.auth.uid
+        && id == request.resource.data.productId + '_' + request.auth.uid
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5;
+    }
+    match /reviews/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && validReview(id);
+      allow update: if isSignedIn() && validReview(id) && resource.data.uid == request.auth.uid;
+      allow delete: if (isSignedIn() && resource.data.uid == request.auth.uid)
+        || roleIn(['product-manager', 'admin', 'superuser']);
+    }
+
+    // ---- subscriptions (standing/scheduled orders; materialized by the notify Worker) ----
+    // A buyer fully owns their own (customerId == uid). Order-servers may read to see upcoming
+    // pickups. The Worker uses the service account and bypasses these rules.
+    match /subscriptions/{id} {
+      allow read: if roleIn(['sales', 'admin', 'superuser'])
+        || (isSignedIn() && resource.data.customerId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.customerId == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.customerId == request.auth.uid
+        && request.resource.data.customerId == resource.data.customerId;
+      allow delete: if isSignedIn() && resource.data.customerId == request.auth.uid;
+    }
+
+    // ---- announcements (shop broadcasts shown on the buyer Home) ----
+    match /announcements/{id} {
+      allow read: if isSignedIn();
+      allow write: if roleIn(['admin', 'superuser']);
+    }
+
+    // ---- delivery feedback (buyer rates a served order's delivery; admin-facing) ----
+    // Buyer writes only their own, at the deterministic id = orderId, rating 1–5. Read is
+    // limited to the owner and shop admins/superusers (the Feedback screen).
+    match /deliveryFeedback/{id} {
+      allow read: if roleIn(['admin', 'superuser'])
+        || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create, update: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && id == request.resource.data.orderId
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5;
     }
 
     // ---- delivery zones (serviceable pincodes + fees) ----

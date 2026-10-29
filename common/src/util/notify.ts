@@ -3,7 +3,8 @@
 export type NotifyEvent =
   | { event: 'new-order'; shopId: string; orderId: string }
   | { event: 'order-status'; customerId: string; status: string; orderId?: string }
-  | { event: 'back-in-stock'; shopId: string; productId: string; productName?: string };
+  | { event: 'back-in-stock'; shopId: string; productId: string; productName?: string }
+  | { event: 'broadcast'; shopId: string; title: string; body: string; productId?: string };
 
 export async function sendNotify(
   url: string | undefined | null,

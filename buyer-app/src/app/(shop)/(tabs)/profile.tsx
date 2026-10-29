@@ -1,9 +1,9 @@
 import { getCustomer, isValidPhone, sanitizePhone, saveAddresses, setCustomerPhone, type Address } from '@common';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { useToast } from '@/components/feedback';
+import { useToast, useConfirm } from '@/components/feedback';
 import { LocationPicker } from '@/components/location-picker';
 import { Badge, Button, Card, DANGER, EmptyState, PRIMARY, Screen, SectionTitle, TextField } from '@/components/kit';
 import { ThemedText } from '@/components/themed-text';
@@ -13,10 +13,11 @@ import { useAuth } from '@/lib/auth';
 import { LOCALES, useI18n } from '@/lib/i18n';
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const theme = useTheme();
   const { locale, setLocale, t } = useI18n();
   const toast = useToast();
+  const confirm = useConfirm();
   const uid = user?.uid;
 
   const [phone, setPhone] = useState('');
@@ -105,6 +106,17 @@ export default function Profile() {
     } finally {
       setSavingAddresses(false);
     }
+  };
+
+  const confirmSignOut = async () => {
+    const ok = await confirm({
+      title: t('common.signOut', 'Sign out'),
+      message: t('profile.signOutConfirm', 'Sign out of your account on this device?'),
+      confirmText: t('common.signOut', 'Sign out'),
+      destructive: true,
+    });
+    if (ok) await signOut();
+    // The (shop) auth gate redirects to sign-in once the user becomes null.
   };
 
   if (!user) return null;
@@ -232,6 +244,16 @@ export default function Profile() {
         <Button title={t('profile.addAddress', 'Add address')} variant="secondary" onPress={addAddress} />
         <Button title={t('profile.saveAddresses', 'Save addresses')} onPress={saveAddressList} loading={savingAddresses} />
       </View>
+
+      <SectionTitle>{t('profile.account', 'Account')}</SectionTitle>
+      <Card style={{ gap: Spacing.two }}>
+        <Button
+          title={t('subscribe.manageTitle', 'My subscriptions')}
+          variant="secondary"
+          onPress={() => router.push('/subscriptions')}
+        />
+        <Button title={t('common.signOut', 'Sign out')} variant="secondary" onPress={() => void confirmSignOut()} />
+      </Card>
 
       <ThemedText type="small" themeColor="textSecondary" style={styles.credit}>
         made by Muhil Kennedy

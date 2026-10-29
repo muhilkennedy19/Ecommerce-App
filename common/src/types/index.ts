@@ -27,6 +27,14 @@ export interface AppUser {
 
 export type Weekday = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
 
+/**
+ * A festive overlay the admin can place on top of the buyer logo (splash + home header).
+ * One effect covers a pair of related occasions:
+ *   fireworks → Diwali · flag → Republic/Independence Day · santa → Christmas/New Year.
+ * Absent/`none` = the plain logo.
+ */
+export type OccasionEffect = 'none' | 'fireworks' | 'flag' | 'santa';
+
 /** Open/close times are "HH:MM" (24h) in the shop's timezone. */
 export interface OperatingDay {
   open: string;
@@ -44,6 +52,12 @@ export interface Shop {
   name: string;
   /** Global sale discount applied on top of products, 0–100. */
   salesDiscountPercent: number;
+  /**
+   * Minimum cart subtotal (₹) required to start a product subscription. Subscriptions are
+   * cart-based and delivered free, so a floor avoids uneconomical tiny standing orders.
+   * 0/absent = subscriptions disabled.
+   */
+  subscriptionMinOrder?: number | null;
   operatingHours: OperatingHours;
   /** When true, the shop is closed regardless of the schedule (manual override). */
   forceClosed?: boolean;
@@ -52,6 +66,20 @@ export interface Shop {
   upiPayeeName?: string | null;
   /** `images/{id}` holding the shop logo shown on the buyer launch screen. */
   logoImageId?: string | null;
+  /** Festive overlay drawn on top of the buyer logo (splash + home header). */
+  iconEffect?: OccasionEffect | null;
+  /** Short tagline shown under the shop name on the buyer Contact Us screen. */
+  tagline?: string | null;
+  /** Full postal address (free-form, multi-line) shown on Contact Us. */
+  address?: string | null;
+  /** Primary / secondary contact numbers (buyers can tap to call). */
+  contactPhone1?: string | null;
+  contactPhone2?: string | null;
+  /** Contact email (buyers can tap to compose). */
+  contactEmail?: string | null;
+  /** Shop location pin (WGS84); lets buyers open directions in their maps app. */
+  lat?: number | null;
+  lng?: number | null;
   createdAt?: Timestamp;
 }
 
@@ -294,4 +322,89 @@ export interface PendingUser {
   email: string;
   name: string;
   requestedAt?: Timestamp;
+}
+
+/**
+ * A product rating + optional written review. doc id = `${productId}_${uid}` so a buyer has
+ * exactly one (editable) review per product. Purchase-verification is enforced client-side
+ * (the form only shows if the buyer has ordered the product); Rules enforce ownership.
+ */
+export interface Review {
+  id: string;
+  productId: string;
+  shopId: string;
+  uid: string;
+  customerName?: string | null;
+  /** 1–5 stars. */
+  rating: number;
+  text?: string | null;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+/**
+ * A buyer's rating of the DELIVERY experience for one served order (one per order, doc id =
+ * orderId). Kept separate from product reviews so it can feed later sentiment analysis.
+ */
+export interface DeliveryFeedback {
+  id: string; // = orderId
+  orderId: string;
+  shopId: string;
+  uid: string;
+  customerName?: string | null;
+  /** 1–5 stars. */
+  rating: number;
+  text?: string | null;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+export type SubscriptionMode = 'once' | 'recurring';
+export type SubscriptionFrequency = 'daily' | 'weekly';
+
+/**
+ * A buyer's scheduled/standing order for a single product. The notify Worker cron
+ * materializes a fresh `new` order whenever `nextRunAt` comes due, then advances it
+ * (one-time → deactivates; recurring → rolls `nextRunAt` forward).
+ */
+export interface Subscription {
+  id: string;
+  shopId: string;
+  customerId: string;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  /** The subscribed cart: one or more products. Snapshotted at creation time. */
+  items: OrderItem[];
+  /** Items total (₹) at creation — the order the Worker creates is delivered free of charge. */
+  subtotal: number;
+  /** Delivery snapshot. */
+  address?: Address | null;
+  pincode?: string | null;
+  paymentMode: 'cod' | 'upi';
+  note?: string | null;
+  mode: SubscriptionMode;
+  /** "HH:MM" local time — informational; the schedule is driven by the absolute `nextRunAt`. */
+  time: string;
+  frequency?: SubscriptionFrequency | null; // recurring only
+  weekdays?: Weekday[] | null; // recurring + weekly only
+  date?: string | null; // once only, "YYYY-MM-DD"
+  active: boolean;
+  /** Absolute next fire time, computed ON DEVICE (local→UTC) so the Worker needs no tz math. */
+  nextRunAt: Timestamp;
+  lastRunAt?: Timestamp | null;
+  createdAt?: Timestamp;
+}
+
+/** A shop announcement broadcast to buyers (push + a dismissible card on the buyer Home). */
+export interface Announcement {
+  id: string;
+  shopId: string;
+  title: string;
+  body: string;
+  /** `images/{id}` holding an optional banner image. */
+  imageId?: string | null;
+  /** Optional product this announcement links to (buyer taps through to it). */
+  productId?: string | null;
+  active: boolean;
+  createdBy?: string | null;
+  createdAt?: Timestamp;
 }

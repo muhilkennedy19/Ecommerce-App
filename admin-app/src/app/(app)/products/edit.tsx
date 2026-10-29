@@ -41,6 +41,7 @@ import {
   TextField,
 } from '@/components/kit';
 import { useConfirm, useToast } from '@/components/feedback';
+import { ScanFrame } from '@/components/scan-frame';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useCachedImage } from '@/hooks/use-cached-image';
@@ -659,6 +660,7 @@ export default function EditProductScreen() {
               <Button title={t('product.grantCamera', 'Grant camera access')} onPress={() => void requestCamPerm()} />
             </View>
           )}
+          {camPerm?.granted ? <ScanFrame /> : null}
           <View style={styles.scanBar}>
             <ThemedText style={{ color: '#fff', textAlign: 'center' }}>
               {t('product.scanHint', 'Point at a barcode — each scan adds to the list.')}

@@ -1,5 +1,9 @@
 import { roundMoney, type ProductUnit } from '@common';
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+
+/** AsyncStorage key the cart is persisted under, so it survives an app restart. */
+const CART_KEY = 'cart';
 
 /** A single line in the buyer's cart. Mirrors the shared `OrderItem` shape. */
 export interface CartLine {
@@ -34,6 +38,44 @@ const CartContext = createContext<CartState | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
+  // Flips true once we've read any persisted cart back in. It gates the write-back effect
+  // (so the initial empty state can't clobber a saved cart) AND, being state, re-triggers that
+  // effect when it flips — persisting a cart the buyer built before hydration resolved.
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate once on mount. If the buyer already added something before the async
+  // read resolved, keep their in-flight cart rather than overwriting it.
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(CART_KEY)
+      .then((raw) => {
+        if (!active) return;
+        if (raw) {
+          try {
+            const saved = JSON.parse(raw) as CartLine[];
+            if (Array.isArray(saved)) {
+              setLines((cur) => (cur.length ? cur : saved));
+            }
+          } catch {
+            // ignore a corrupt cart blob — start empty
+          }
+        }
+        setHydrated(true);
+      })
+      .catch(() => {
+        setHydrated(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Persist on every change once hydrated. Fire-and-forget; a write failure is non-fatal.
+  // Runs when `hydrated` first flips true too, so a pre-hydration add gets saved.
+  useEffect(() => {
+    if (!hydrated) return;
+    AsyncStorage.setItem(CART_KEY, JSON.stringify(lines)).catch(() => {});
+  }, [lines, hydrated]);
 
   const value = useMemo<CartState>(() => {
     const add: CartState['add'] = (item) =>

@@ -27,6 +27,7 @@ import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, Card, DANGER, EmptyState, PRIMARY, Screen, SectionTitle, TextField } from '@/components/kit';
 import { useToast } from '@/components/feedback';
+import { ScanFrame } from '@/components/scan-frame';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -419,6 +420,7 @@ export default function PosScreen() {
               <Button title={t('pos.grantCamera', 'Grant camera access')} onPress={() => void requestCamPerm()} />
             </View>
           )}
+          {camPerm?.granted ? <ScanFrame /> : null}
           <View style={styles.scanBar}>
             <ThemedText style={{ color: '#fff', textAlign: 'center' }}>
               {t('pos.scanHint', 'Point at a product barcode to add it.')}

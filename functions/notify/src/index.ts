@@ -40,6 +40,7 @@ type IncomingBody =
   | { event: "new-order"; shopId: string; orderId: string }
   | { event: "order-status"; customerId: string; status: string; orderId?: string }
   | { event: "back-in-stock"; shopId: string; productId: string; productName?: string }
+  | { event: "broadcast"; shopId: string; title: string; body: string; productId?: string }
   | { event: "email"; to: string; subject: string; text: string; html?: string; fromName?: string };
 
 interface Notification {
@@ -148,6 +149,16 @@ export default {
           };
           break;
         }
+        case "broadcast": {
+          recipients = await getBuyerRecipients(ctx);
+          notification = { title: body.title, body: body.body };
+          data = {
+            event: "broadcast",
+            shopId: body.shopId,
+            ...(body.productId ? { productId: body.productId } : {}),
+          };
+          break;
+        }
         default: {
           return json({ error: "Unknown event" }, 400);
         }
@@ -189,64 +200,75 @@ export default {
 
     const ctx: Ctx = { accessToken, projectId: serviceAccount.project_id };
 
-    let orders: FirestoreDoc[];
-    try {
-      orders = await findNewOrders(ctx);
-    } catch {
-      return;
-    }
-    if (orders.length === 0) {
-      return;
-    }
-
-    // Resolve the admin recipients once and reuse them for every order — same
-    // recipients + high-priority "orders" ring as the `new-order` event.
-    let recipients: Recipient[];
-    try {
-      recipients = await getAdminRecipients(ctx);
-    } catch {
-      return;
-    }
-
-    const notification: Notification = {
-      title: "New order still waiting",
-      body: "An order hasn't been picked up yet — tap to view",
-    };
-
-    const nowMs = Date.now();
-
-    await Promise.all(
-      orders.map(async (doc) => {
-        try {
-          // Only act on orders that have been waiting past the 30s threshold.
-          const createdAt = doc.fields?.createdAt?.timestampValue;
-          if (!createdAt) return;
-          const createdMs = Date.parse(createdAt);
-          if (!Number.isFinite(createdMs)) return;
-          if (nowMs - createdMs <= REMINDER_MIN_AGE_MS) return;
-
-          // Safety cap so an order can never ring forever.
-          const remindersRaw = doc.fields?.reminders?.integerValue;
-          const reminders = remindersRaw ? Number.parseInt(remindersRaw, 10) : 0;
-          if (Number.isFinite(reminders) && reminders >= REMINDER_CAP) return;
-
-          const orderId = docId(doc.name);
-          const shopId = doc.fields?.shopId?.stringValue;
-          const data: Record<string, string> = {
-            event: "order-reminder",
-            orderId,
-            ...(shopId ? { shopId } : {}),
-          };
-
-          await sendToRecipients(ctx, recipients, notification, data, true);
-          await bumpReminder(ctx, doc.name, (Number.isFinite(reminders) ? reminders : 0) + 1);
-        } catch {
-          // Swallow per-order failures so one bad order can't abort the batch.
-        }
-      }),
-    );
+    // Two independent sweeps: re-ring stale unpicked orders, and materialize any
+    // due product subscriptions into fresh orders. Run both so one failing can't
+    // skip the other.
+    await Promise.allSettled([remindStaleOrders(ctx), materializeDueSubscriptions(ctx)]);
   },
 } satisfies ExportedHandler<Env>;
+
+/**
+ * Re-ring employees for any `orders` still in `status === 'new'` past the age
+ * threshold, until picked up or the per-order reminder cap is hit.
+ */
+async function remindStaleOrders(ctx: Ctx): Promise<void> {
+  let orders: FirestoreDoc[];
+  try {
+    orders = await findNewOrders(ctx);
+  } catch {
+    return;
+  }
+  if (orders.length === 0) {
+    return;
+  }
+
+  // Resolve the admin recipients once and reuse them for every order — same
+  // recipients + high-priority "orders" ring as the `new-order` event.
+  let recipients: Recipient[];
+  try {
+    recipients = await getAdminRecipients(ctx);
+  } catch {
+    return;
+  }
+
+  const notification: Notification = {
+    title: "New order still waiting",
+    body: "An order hasn't been picked up yet — tap to view",
+  };
+
+  const nowMs = Date.now();
+
+  await Promise.all(
+    orders.map(async (doc) => {
+      try {
+        // Only act on orders that have been waiting past the 30s threshold.
+        const createdAt = doc.fields?.createdAt?.timestampValue;
+        if (!createdAt) return;
+        const createdMs = Date.parse(createdAt);
+        if (!Number.isFinite(createdMs)) return;
+        if (nowMs - createdMs <= REMINDER_MIN_AGE_MS) return;
+
+        // Safety cap so an order can never ring forever.
+        const remindersRaw = doc.fields?.reminders?.integerValue;
+        const reminders = remindersRaw ? Number.parseInt(remindersRaw, 10) : 0;
+        if (Number.isFinite(reminders) && reminders >= REMINDER_CAP) return;
+
+        const orderId = docId(doc.name);
+        const shopId = doc.fields?.shopId?.stringValue;
+        const data: Record<string, string> = {
+          event: "order-reminder",
+          orderId,
+          ...(shopId ? { shopId } : {}),
+        };
+
+        await sendToRecipients(ctx, recipients, notification, data, true);
+        await bumpReminder(ctx, doc.name, (Number.isFinite(reminders) ? reminders : 0) + 1);
+      } catch {
+        // Swallow per-order failures so one bad order can't abort the batch.
+      }
+    }),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Firebase ID token verification
@@ -408,9 +430,12 @@ function firestoreBase(projectId: string): string {
 interface FirestoreValue {
   stringValue?: string;
   integerValue?: string;
+  doubleValue?: number;
   timestampValue?: string;
   booleanValue?: boolean;
+  nullValue?: null;
   arrayValue?: { values?: FirestoreValue[] };
+  mapValue?: { fields?: Record<string, FirestoreValue> };
 }
 
 interface FirestoreDoc {
@@ -457,6 +482,39 @@ async function getAdminRecipients(ctx: Ctx): Promise<Recipient[]> {
         (!!role && ORDER_RECIPIENT_ROLES.has(role)) ||
         roles.some((r) => ORDER_RECIPIENT_ROLES.has(r));
       if (token && kind === "admin" && qualifies && !notifyOff) {
+        recipients.push({ token, ownerId: docId(doc.name) });
+      }
+    }
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return recipients;
+}
+
+/**
+ * FCM tokens for buyer devices (the `broadcast` event). Includes every `pushTokens`
+ * doc with `kind === 'buyer'` that hasn't opted out (`notify === false`).
+ */
+async function getBuyerRecipients(ctx: Ctx): Promise<Recipient[]> {
+  const base = firestoreBase(ctx.projectId);
+  const recipients: Recipient[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const url = new URL(`${base}/pushTokens`);
+    url.searchParams.set("pageSize", "300");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const resp = await authedGet(ctx, url.toString());
+    if (!resp.ok) {
+      throw new Error(`list pushTokens ${resp.status}: ${await safeText(resp)}`);
+    }
+    const data = (await resp.json()) as { documents?: FirestoreDoc[]; nextPageToken?: string };
+    for (const doc of data.documents ?? []) {
+      const token = doc.fields?.token?.stringValue;
+      const kind = doc.fields?.kind?.stringValue;
+      const notifyOff = doc.fields?.notify?.booleanValue === false;
+      if (token && kind === "buyer" && !notifyOff) {
         recipients.push({ token, ownerId: docId(doc.name) });
       }
     }
@@ -596,6 +654,284 @@ async function bumpReminder(ctx: Ctx, name: string | undefined, nextCount: numbe
   if (!resp.ok) {
     throw new Error(`patch order ${resp.status}: ${await safeText(resp)}`);
   }
+}
+
+// --- Subscription sweep (cron) --------------------------------------------
+
+/** One day / one week in milliseconds, for rolling a recurring schedule forward. */
+const SUB_STEP_MS: Record<string, number> = {
+  daily: 86_400_000,
+  weekly: 7 * 86_400_000,
+};
+
+/** Reads a Firestore numeric value (double or integer-as-string). */
+function readNumber(v: FirestoreValue | undefined): number | undefined {
+  if (!v) return undefined;
+  if (typeof v.doubleValue === "number") return v.doubleValue;
+  if (typeof v.integerValue === "string") return Number.parseFloat(v.integerValue);
+  return undefined;
+}
+
+/** Sum price*qty over an order/subscription items arrayValue (for a subtotal fallback). */
+function sumItems(items: FirestoreValue): number {
+  let s = 0;
+  for (const v of items.arrayValue?.values ?? []) {
+    const fields = v.mapValue?.fields ?? {};
+    s += (readNumber(fields.price) ?? 0) * (readNumber(fields.qty) ?? 0);
+  }
+  return Math.round(s * 100) / 100;
+}
+
+/** All `subscriptions` that are active and whose next fire time has arrived. */
+async function findDueSubscriptions(ctx: Ctx, nowIso: string): Promise<FirestoreDoc[]> {
+  const base = firestoreBase(ctx.projectId);
+  const resp = await fetch(`${base}:runQuery`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${ctx.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "subscriptions" }],
+        where: {
+          compositeFilter: {
+            op: "AND",
+            filters: [
+              {
+                fieldFilter: {
+                  field: { fieldPath: "active" },
+                  op: "EQUAL",
+                  value: { booleanValue: true },
+                },
+              },
+              {
+                fieldFilter: {
+                  field: { fieldPath: "nextRunAt" },
+                  op: "LESS_THAN_OR_EQUAL",
+                  value: { timestampValue: nowIso },
+                },
+              },
+            ],
+          },
+        },
+      },
+    }),
+  });
+  if (!resp.ok) {
+    throw new Error(`runQuery subscriptions ${resp.status}: ${await safeText(resp)}`);
+  }
+  const rows = (await resp.json()) as Array<{ document?: FirestoreDoc }>;
+  const docs: FirestoreDoc[] = [];
+  for (const row of rows) {
+    if (row.document) docs.push(row.document);
+  }
+  return docs;
+}
+
+/**
+ * Creates a `new` order in the `orders` collection from a due subscription doc.
+ * The product/address snapshots stored on the subscription are copied straight into
+ * the order (the address value is reused verbatim as a Firestore map).
+ */
+async function createOrderFromSubscription(
+  ctx: Ctx,
+  sub: FirestoreDoc,
+  nowIso: string,
+  nowMs: number,
+): Promise<void> {
+  const f = sub.fields ?? {};
+  const str = (k: string): string => f[k]?.stringValue ?? "";
+  const customerId = str("customerId");
+  const subNote = f.note?.stringValue;
+  const nameVal: FirestoreValue = f.customerName ?? { nullValue: null };
+
+  // Cart subscription: the subscribed line items are stored as an array of maps — reuse them
+  // verbatim as the order's items. Fall back to a legacy single-product subscription shape
+  // (productId/productName/price/qty) so older subscription docs still produce a real order.
+  let items: FirestoreValue = f.items ?? { arrayValue: { values: [] } };
+  if (!items.arrayValue?.values?.length && f.productId) {
+    items = {
+      arrayValue: {
+        values: [
+          {
+            mapValue: {
+              fields: {
+                productId: f.productId,
+                name: f.productName ?? { stringValue: "" },
+                price: { doubleValue: readNumber(f.price) ?? 0 },
+                qty: { doubleValue: readNumber(f.qty) ?? 1 },
+                unit: f.unit ?? { nullValue: null },
+              },
+            },
+          },
+        ],
+      },
+    };
+  }
+  // Prefer the stored subtotal; if absent/zero, derive it from the items so the order total
+  // is never ₹0 for a non-empty cart.
+  const subtotal = readNumber(f.subtotal) || sumItems(items);
+
+  const statusEntry: FirestoreValue = {
+    mapValue: {
+      fields: {
+        at: { integerValue: String(nowMs) },
+        by: { stringValue: customerId },
+        byName: nameVal,
+        status: { stringValue: "new" },
+      },
+    },
+  };
+
+  const fields: Record<string, FirestoreValue> = {
+    shopId: f.shopId ?? { nullValue: null },
+    customerId: { stringValue: customerId },
+    customerName: nameVal,
+    customerPhone: f.customerPhone ?? { nullValue: null },
+    items,
+    subtotal: { doubleValue: subtotal },
+    total: { doubleValue: subtotal },
+    deliveryFee: { doubleValue: 0 },
+    couponCode: { nullValue: null },
+    discount: { doubleValue: 0 },
+    grandTotal: { doubleValue: subtotal },
+    paymentMode: f.paymentMode ?? { stringValue: "cod" },
+    paymentStatus: { stringValue: "pending" },
+    upiRef: { nullValue: null },
+    channel: { stringValue: "online" },
+    address: f.address ?? { nullValue: null },
+    pincode: f.pincode ?? { nullValue: null },
+    status: { stringValue: "new" },
+    stockApplied: { booleanValue: false },
+    assignedTo: { nullValue: null },
+    note: { stringValue: subNote ? `Subscription — ${subNote}` : "Subscription order" },
+    changeLog: { arrayValue: { values: [] } },
+    statusLog: { arrayValue: { values: [statusEntry] } },
+    amountDelta: { doubleValue: 0 },
+    subscriptionId: { stringValue: docId(sub.name) },
+    createdAt: { timestampValue: nowIso },
+    updatedAt: { timestampValue: nowIso },
+  };
+
+  // Idempotent create: a deterministic doc id (subscription + the due fire time) means a
+  // retried cron tick — e.g. if advanceSubscription failed after a prior create — overwrites
+  // the SAME order instead of spawning a duplicate. PATCH upserts the doc at that id.
+  const dueMs = Date.parse(f.nextRunAt?.timestampValue ?? "") || nowMs;
+  const orderId = `sub_${docId(sub.name)}_${dueMs}`;
+  const base = firestoreBase(ctx.projectId);
+  const resp = await fetch(`${base}/orders/${encodeURIComponent(orderId)}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${ctx.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ fields }),
+  });
+  if (!resp.ok) {
+    throw new Error(`create order ${resp.status}: ${await safeText(resp)}`);
+  }
+}
+
+/** Rolls `nextRunAt` forward (recurring) or deactivates (one-time) after firing. */
+async function advanceSubscription(
+  ctx: Ctx,
+  sub: FirestoreDoc,
+  nowIso: string,
+  nowMs: number,
+): Promise<void> {
+  const f = sub.fields ?? {};
+  const mode = f.mode?.stringValue;
+  const url = new URL(`https://firestore.googleapis.com/v1/${sub.name}`);
+  let body: { fields: Record<string, FirestoreValue> };
+
+  if (mode === "recurring") {
+    const step = SUB_STEP_MS[f.frequency?.stringValue ?? "daily"] ?? SUB_STEP_MS.daily;
+    const prevIso = f.nextRunAt?.timestampValue;
+    let ms = prevIso ? Date.parse(prevIso) : nowMs;
+    if (!Number.isFinite(ms)) ms = nowMs;
+    // Roll whole steps until strictly in the future — catch up missed ticks without
+    // emitting a burst (we only ever schedule the single next occurrence).
+    while (ms <= nowMs) ms += step;
+    url.searchParams.append("updateMask.fieldPaths", "nextRunAt");
+    url.searchParams.append("updateMask.fieldPaths", "lastRunAt");
+    body = {
+      fields: {
+        nextRunAt: { timestampValue: new Date(ms).toISOString() },
+        lastRunAt: { timestampValue: nowIso },
+      },
+    };
+  } else {
+    url.searchParams.append("updateMask.fieldPaths", "active");
+    url.searchParams.append("updateMask.fieldPaths", "lastRunAt");
+    body = {
+      fields: {
+        active: { booleanValue: false },
+        lastRunAt: { timestampValue: nowIso },
+      },
+    };
+  }
+
+  const resp = await fetch(url.toString(), {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${ctx.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    throw new Error(`advance subscription ${resp.status}: ${await safeText(resp)}`);
+  }
+}
+
+/**
+ * Materializes every due subscription into a fresh `new` order, advances its
+ * schedule, and rings order-handling staff (same recipients as `new-order`).
+ */
+async function materializeDueSubscriptions(ctx: Ctx): Promise<void> {
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+
+  let due: FirestoreDoc[];
+  try {
+    due = await findDueSubscriptions(ctx, nowIso);
+  } catch {
+    return;
+  }
+  if (due.length === 0) return;
+
+  let recipients: Recipient[] = [];
+  try {
+    recipients = await getAdminRecipients(ctx);
+  } catch {
+    recipients = [];
+  }
+  const notification: Notification = {
+    title: "New order",
+    body: "A scheduled order just came in — tap to view",
+  };
+
+  await Promise.all(
+    due.map(async (sub) => {
+      try {
+        await createOrderFromSubscription(ctx, sub, nowIso, nowMs);
+        await advanceSubscription(ctx, sub, nowIso, nowMs);
+        if (recipients.length > 0) {
+          const shopId = sub.fields?.shopId?.stringValue;
+          await sendToRecipients(
+            ctx,
+            recipients,
+            notification,
+            { event: "new-order", ...(shopId ? { shopId } : {}) },
+            true,
+          );
+        }
+      } catch {
+        // Swallow per-subscription failures so one bad sub can't abort the batch.
+      }
+    }),
+  );
 }
 
 /** Extracts the last path segment of a Firestore document resource name. */

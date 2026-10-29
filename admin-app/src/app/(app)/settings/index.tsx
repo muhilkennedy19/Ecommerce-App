@@ -13,6 +13,7 @@ import {
   userHasPermission,
   userHasRole,
   type DeliveryZone,
+  type OccasionEffect,
   type OperatingHours,
   type Shop,
   type Weekday,
@@ -37,6 +38,7 @@ import {
   TextField,
 } from '@/components/kit';
 import { useConfirm, useToast } from '@/components/feedback';
+import { LocationPicker, type LatLng } from '@/components/location-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useCachedImage } from '@/hooks/use-cached-image';
@@ -87,6 +89,21 @@ export default function Settings() {
   const [upiPayee, setUpiPayee] = useState('');
   const [savingUpi, setSavingUpi] = useState(false);
 
+  const [subMin, setSubMin] = useState('');
+  const [savingSubMin, setSavingSubMin] = useState(false);
+
+  // Shop contact details (shown on the buyer Contact Us tab).
+  const [tagline, setTagline] = useState('');
+  const [address, setAddress] = useState('');
+  const [phone1, setPhone1] = useState('');
+  const [phone2, setPhone2] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [pin, setPin] = useState<LatLng | null>(null);
+  const [savingContact, setSavingContact] = useState(false);
+
+  // Festive overlay drawn on top of the buyer logo.
+  const [iconEffect, setIconEffect] = useState<OccasionEffect>('none');
+
   const [savingLogo, setSavingLogo] = useState(false);
   const logoUri = useCachedImage(shop?.logoImageId);
 
@@ -113,6 +130,14 @@ export default function Settings() {
         setForceClosed(!!s.forceClosed);
         setUpiVpa(s.upiVpa ?? '');
         setUpiPayee(s.upiPayeeName ?? '');
+        setSubMin(s.subscriptionMinOrder ? String(s.subscriptionMinOrder) : '');
+        setTagline(s.tagline ?? '');
+        setAddress(s.address ?? '');
+        setPhone1(s.contactPhone1 ?? '');
+        setPhone2(s.contactPhone2 ?? '');
+        setContactEmail(s.contactEmail ?? '');
+        setPin(s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null);
+        setIconEffect(s.iconEffect ?? 'none');
       }
     });
   }, [canConfig]);
@@ -234,6 +259,58 @@ export default function Settings() {
       toast({ type: 'error', title: t('common.couldNotSave', 'Could not save'), message: String(e) });
     } finally {
       setSavingUpi(false);
+    }
+  }
+
+  async function saveSubMin() {
+    setSavingSubMin(true);
+    try {
+      const n = subMin.trim() ? Math.max(0, Math.round(Number(subMin) || 0)) : 0;
+      await updateShop(shopId, { subscriptionMinOrder: n || null });
+      toast({
+        type: 'success',
+        title: t('common.saved', 'Saved') + ' ✓',
+        message: t('subscribe.minUpdated', 'Subscription minimum updated.'),
+      });
+    } catch (e) {
+      toast({ type: 'error', title: t('common.couldNotSave', 'Could not save'), message: String(e) });
+    } finally {
+      setSavingSubMin(false);
+    }
+  }
+
+  async function saveContact() {
+    setSavingContact(true);
+    try {
+      await updateShop(shopId, {
+        tagline: tagline.trim() || null,
+        address: address.trim() || null,
+        contactPhone1: phone1.trim() || null,
+        contactPhone2: phone2.trim() || null,
+        contactEmail: contactEmail.trim() || null,
+        lat: pin?.lat ?? null,
+        lng: pin?.lng ?? null,
+      });
+      toast({
+        type: 'success',
+        title: t('common.saved', 'Saved') + ' ✓',
+        message: t('settings.contactUpdated', 'Contact details updated.'),
+      });
+    } catch (e) {
+      toast({ type: 'error', title: t('common.couldNotSave', 'Could not save'), message: String(e) });
+    } finally {
+      setSavingContact(false);
+    }
+  }
+
+  async function saveIconEffect(effect: OccasionEffect) {
+    const previous = iconEffect;
+    setIconEffect(effect); // optimistic
+    try {
+      await updateShop(shopId, { iconEffect: effect });
+    } catch (e) {
+      setIconEffect(previous); // revert on failure
+      toast({ type: 'error', title: t('settings.couldNotUpdate', 'Could not update'), message: String(e) });
     }
   }
 
@@ -417,6 +494,59 @@ export default function Settings() {
         <Button title={t('settings.saveDetails', 'Save details')} loading={saving} onPress={() => void saveDetails()} />
       </Card>
 
+      <SectionTitle>{t('settings.contactDetails', 'Contact details')}</SectionTitle>
+      <Card style={{ gap: Spacing.two }}>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('settings.contactHint', 'Shown to buyers on the Contact us tab of the buyer app.')}
+        </ThemedText>
+        <TextField
+          label={t('settings.tagline', 'Tagline')}
+          value={tagline}
+          onChangeText={setTagline}
+          placeholder={t('settings.taglinePlaceholder', 'Fresh groceries, delivered daily')}
+        />
+        <TextField
+          label={t('settings.address', 'Address')}
+          value={address}
+          onChangeText={setAddress}
+          placeholder={t('settings.addressPlaceholder', 'Door, street, area, city, pincode')}
+          multiline
+          numberOfLines={3}
+          style={{ minHeight: 72, textAlignVertical: 'top' }}
+        />
+        <TextField
+          label={t('settings.phone1', 'Contact number 1')}
+          value={phone1}
+          onChangeText={setPhone1}
+          placeholder="9876543210"
+          keyboardType="phone-pad"
+        />
+        <TextField
+          label={t('settings.phone2', 'Contact number 2')}
+          value={phone2}
+          onChangeText={setPhone2}
+          placeholder="9876543210"
+          keyboardType="phone-pad"
+        />
+        <TextField
+          label={t('settings.contactEmail', 'Email')}
+          value={contactEmail}
+          onChangeText={setContactEmail}
+          placeholder="shop@example.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <ThemedText type="smallBold" style={{ marginTop: Spacing.one }}>
+          {t('settings.locationPin', 'Shop location pin')}
+        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('settings.locationPinHint', 'Lets buyers open directions to the shop in their maps app.')}
+        </ThemedText>
+        <LocationPicker value={pin} onChange={setPin} />
+        <Button title={t('settings.saveContact', 'Save contact details')} loading={savingContact} onPress={() => void saveContact()} />
+      </Card>
+
       <SectionTitle>{t('settings.logo', 'Shop logo')}</SectionTitle>
       <Card style={{ gap: Spacing.two }}>
         <ThemedText type="small" themeColor="textSecondary">
@@ -457,6 +587,28 @@ export default function Settings() {
         ) : null}
       </Card>
 
+      <SectionTitle>{t('settings.iconEffect', 'Logo icon effect')}</SectionTitle>
+      <Card style={{ gap: Spacing.two }}>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('settings.iconEffectHint', 'A festive decoration shown on top of your logo in the buyer app.')}
+        </ThemedText>
+        {(
+          [
+            { key: 'none', glyph: '', label: t('settings.effectNone', 'Default (no effect)') },
+            { key: 'fireworks', glyph: '🎆', label: t('settings.effectFireworks', 'Fireworks · Diwali') },
+            { key: 'flag', glyph: '🇮🇳', label: t('settings.effectFlag', 'Indian flag · Republic / Independence Day') },
+            { key: 'santa', glyph: '🎅', label: t('settings.effectSanta', 'Santa cap · Christmas / New Year') },
+          ] as { key: OccasionEffect; glyph: string; label: string }[]
+        ).map((e) => (
+          <Button
+            key={e.key}
+            title={e.glyph ? `${e.glyph}  ${e.label}` : e.label}
+            variant={iconEffect === e.key ? 'primary' : 'secondary'}
+            onPress={() => void saveIconEffect(e.key)}
+          />
+        ))}
+      </Card>
+
       <SectionTitle>{t('payments.upiSection', 'UPI payments')}</SectionTitle>
       <Card>
         <ThemedText type="small" themeColor="textSecondary">
@@ -477,6 +629,24 @@ export default function Settings() {
           placeholder={t('settings.myShop', 'My Shop')}
         />
         <Button title={t('payments.saveUpi', 'Save UPI details')} loading={savingUpi} onPress={() => void saveUpi()} />
+      </Card>
+
+      <SectionTitle>{t('subscribe.section', 'Subscriptions')}</SectionTitle>
+      <Card>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t(
+            'subscribe.minNote',
+            'Minimum cart total (₹) a buyer needs to start a subscription. Subscription orders are delivered free. Leave 0 to disable subscriptions.',
+          )}
+        </ThemedText>
+        <TextField
+          label={t('subscribe.minLabel', 'Minimum order (₹)')}
+          value={subMin}
+          onChangeText={setSubMin}
+          keyboardType="numeric"
+          placeholder="0"
+        />
+        <Button title={t('subscribe.saveMin', 'Save minimum')} loading={savingSubMin} onPress={() => void saveSubMin()} />
       </Card>
 
       <SectionTitle>{t('settings.hours', 'Operating hours')}</SectionTitle>

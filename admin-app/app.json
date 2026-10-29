@@ -52,6 +52,12 @@
           "cameraPermission": "Allow the app to use the camera to scan product barcodes.",
           "barcodeScannerEnabled": true
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow the app to use your location to set the shop's location pin on the map."
+        }
       ]
     ],
     "experiments": {

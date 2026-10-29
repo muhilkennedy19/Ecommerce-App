@@ -37,6 +37,7 @@
       ],
       "@react-native-google-signin/google-signin",
       "expo-notifications",
+      "@react-native-community/datetimepicker",
       [
         "expo-location",
         {
