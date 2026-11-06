@@ -40,6 +40,7 @@ export default function EmployeesScreen() {
   // and is unset for users granted a role through the multi-role picker.
   const canRead = userHasPermission(appUser, 'employees.read');
   const canWrite = userHasPermission(appUser, 'employees.write');
+  const canManageRoles = userHasPermission(appUser, 'roles.manage');
 
   useEffect(() => {
     if (!canRead) return;
@@ -76,7 +77,7 @@ export default function EmployeesScreen() {
           subject: t('emp.inviteSubject', "You've been invited to the shop team"),
           text: t(
             'emp.inviteBody',
-            'Hi {name},\n\nYou have been invited to join the shop team. Open the Seller app, sign in with this email ({email}) using Google, and you will be granted access.\n\nOnboarding code: {token}\n\nThanks.',
+            'Hi {name},\n\nYou have been invited to join the shop team. Open the MKEN ECommerce Admin app, sign in with this email ({email}) using Google, and you will be granted access.\n\nOnboarding code: {token}\n\nThanks.',
             { name: trimmedName, email: trimmedEmail, token },
           ),
         });
@@ -112,6 +113,19 @@ export default function EmployeesScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: t('employees.title', 'Employees') }} />
+
+      {canManageRoles ? (
+        <Card>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('employees.teamRolesHint', 'Grant roles and manage who can access what.')}
+          </ThemedText>
+          <Button
+            title={t('employees.teamRoles', 'Team & Roles')}
+            variant="secondary"
+            onPress={() => router.push('/roles' as never)}
+          />
+        </Card>
+      ) : null}
 
       {canWrite ? (
         <>

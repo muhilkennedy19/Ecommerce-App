@@ -115,7 +115,7 @@ created on first save).
 | Role | Can |
 |------|-----|
 | superuser | Everything (support/admin) |
-| admin | Shop config, operating hours, sale discount, overrides, Fast2SMS key; read products/customers/orders/analytics |
+| admin | Shop config, operating hours, sale discount, overrides, Fast2SMS key; read products/customers/orders/analytics; **manage employees & roles** (but cannot see or assign `superuser`) |
 | product-manager | View/add/edit products & categories |
 | employee-manager | Add/remove/onboard employees |
 | customer-manager | View/edit customers |
@@ -136,19 +136,74 @@ reminders** · employee onboarding (details + photo + proof doc; onboarding toke
 coupons · analytics (date/product filters, revenue chart, order history) with **PDF & Excel
 export** · **broadcast announcements** (compose a message/image + optional linked product,
 pushed to all buyers) · **Feedback** screen (product reviews + delivery ratings; admin/superuser
-only) · settings (shop, operating hours, sale discount, delivery zones, UPI, **subscription
-minimum**, Fast2SMS key).
+only) · **Settings** split into focused tiles — **Settings** (language, shop name, logo, UPI),
+**Contact Details** (address, phones, email, map pin) and **Store Configuration** (operating
+hours, delivery zones, **subscription minimum**); Fast2SMS key · **live courier tracking** (the
+staff member who dispatches an order shares their device location; the buyer sees it on an OSM map
+and gets an "arriving" push near the door) · **order `packed` step** + **running-late / on-time**
+toggle · **public order IDs** (`mken…`) with an order-ID **search box** · **Team & Roles** nested
+under Employees · **loyalty & referrals** (points per ₹100, redemption caps,
+independently switchable referral bonuses) · **low-stock alerts** (per-product reorder level
+→ dashboard badge → restock list) · **day-close report** (takings by channel and payment mode
+with a cash-drawer sign-off line) · **in-house EAN-13 barcodes** + printable label sheet ·
+**sequential invoices** (PDF) · **order status timeline** · **Firebase usage** screen
+(superuser: document counts + estimated storage).
 
 **Buyer:** Google sign-in · browse categories/products with relative expiry ("use by ~2
 days"), on-demand prep time, stock/availability, and **average star rating in the list** ·
 **"not accepting orders" banner** outside the shop's operating hours · **persistent cart** ·
 checkout (delivery zones, coupons, COD/UPI) · **order history** with live status, **reorder**,
-and **buyer cancel while still `new`** · **product subscriptions** — turn the cart into a
+and **buyer cancel while still `new`** · **public order ID** (`mken…`) + **on-time / running-late**
+badge · **live delivery tracking** — "Track on map" shows the courier moving toward you on an OSM
+map (curved route), inline on the order, with an **"arriving at your doorstep" push** · **product
+subscriptions** — turn the cart into a
 standing/scheduled order (one-time or daily/weekly, COD-only, free delivery, gated by the
 admin's minimum) materialized into real orders by a cron · **ratings & reviews** (rate the
 products *and* the delivery of a served order; reviews shown on the product page) ·
 **announcement card** on Home · profile (addresses, phone, language, manage subscriptions,
-sign out).
+sign out) · **loyalty points** (balance, redeem at checkout, referral code with native share) ·
+**bill download** (PDF) and **order tracking timeline** per order · **share a product**.
+
+## Local-only configuration
+
+Everything above works without it, but push, email and crash reporting stay switched off
+until you supply the private values. Copy `app.local.example.json` → `app.local.json` in
+**each** app (both gitignored; `app.config.js` merges them into `expo.extra`):
+
+| Key | What it is |
+|-----|------------|
+| `notifyUrl` | Your deployed Cloudflare Worker URL (push + email). EAS env var: `NOTIFY_URL` |
+| `newRelicKey` | New Relic **INGEST - LICENSE** key (not a USER key) — one.newrelic.com → user menu → API keys |
+| `newRelicRegion` | `"us"` (default) or `"eu"` — must match your account's data region or ingest silently 403s |
+
+Resolution order is **EAS env var → `app.local.json` → `app.json`**.
+
+## Observability
+
+Both apps wrap their tree in an **error boundary**, so a render crash shows a recoverable
+screen instead of a white app, and ship warnings/errors to the **New Relic Log API** over a
+plain HTTPS POST — deliberately *not* a native agent, so Expo's continuous native generation
+stays intact and no Blaze plan is needed.
+
+View them at one.newrelic.com → **Logs**, filtered by `app:admin` or `app:buyer`, or:
+
+```sql
+SELECT * FROM Log WHERE app = 'admin' SINCE 30 MINUTES AGO
+```
+
+Every line carries `appVersion`, `platform`, `shopId`, `uid`, and for crashes `error.class` /
+`error.stack` / `componentStack`.
+
+> `minLevel` is `warn`, so a **healthy app sends nothing** — an empty Logs view does not mean
+> it is broken. Verify ingest with a direct `curl` to `log-api.newrelic.com/log/v1`
+> (expect `202`). Details in [`memory/observability.md`](memory/observability.md).
+
+## Tests
+
+```bash
+npm test          # vitest, the pure money/time/loyalty/barcode/stock logic in common/
+npm run typecheck # all three workspaces
+```
 
 ## Security
 
@@ -170,6 +225,14 @@ Read this before going beyond a prototype.
 
 ## Known limitations / upgrade paths
 
+- **Worker auth is claim-check only** — it validates `aud`/`iss`/`exp` on the Firebase ID
+  token but does **not** verify the RS256 signature, so a forged token with the right claims
+  could trigger notification/email spam (no data is exposed). Must be fixed before the apps
+  are public; working code and a checklist are in
+  [`docs/worker-token-verification.md`](docs/worker-token-verification.md).
+- **The in-app Firebase usage screen estimates storage** (measured image bytes + ~1 KB per
+  other document). Google does not expose live read/write counters or billed storage to
+  client apps — only the console and Cloud Monitoring do.
 - **Images are base64 in Firestore** (to stay on free Spark). The admin compresses/resizes
   before upload, but Firestore caps a document at 1 MB — very large images are rejected with a
   clear error. If you later outgrow this, flip to Cloud Storage (Blaze) or a free file host and

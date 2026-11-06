@@ -31,7 +31,7 @@ export default function SignIn() {
   return (
     <Screen scroll={false} style={styles.center}>
       <View style={styles.hero}>
-        <ThemedText type="title">{t('signin.brand', 'Seller')}</ThemedText>
+        <ThemedText type="title">{t('signin.brand', 'MKEN ECommerce Admin')}</ThemedText>
         <ThemedText type="subtitle">{t('signin.brandSub', 'Admin')}</ThemedText>
       </View>
 

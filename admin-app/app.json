@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Seller",
+    "name": "MKEN ECommerce Admin",
     "slug": "admin-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -56,7 +56,11 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow the app to use your location to set the shop's location pin on the map."
+          "locationWhenInUsePermission": "Allow the app to use your location to set the shop's location pin on the map.",
+          "locationAlwaysAndWhenInUsePermission": "Allow the app to share your location with the customer while you deliver their order.",
+          "isAndroidForegroundServiceEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isIosBackgroundLocationEnabled": true
         }
       ]
     ],

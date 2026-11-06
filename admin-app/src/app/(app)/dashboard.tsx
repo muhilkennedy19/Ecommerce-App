@@ -1,8 +1,9 @@
 import {
   isStaleToday,
+  lowStockReport,
   ROLE_LABELS,
   rolesOf,
-  subscribeOrders,
+  subscribeOpenOrders,
   subscribeProducts,
   userHasPermission,
   userHasRole,
@@ -39,10 +40,12 @@ const SECTIONS: Section[] = [
   { href: '/employees', titleKey: 'dash.employees', title: 'Employees', subKey: 'dash.employees.sub', subtitle: 'Onboard & manage', perm: 'employees.read', emoji: '👥' },
   { href: '/customers', titleKey: 'dash.customers', title: 'Customers', subKey: 'dash.customers.sub', subtitle: 'View & edit', perm: 'customers.read', emoji: '🧾' },
   { href: '/analytics', titleKey: 'dash.analytics', title: 'Analytics', subKey: 'dash.analytics.sub', subtitle: 'Trends & export', perm: 'analytics.read', emoji: '📈' },
-  { href: '/settings', titleKey: 'dash.settings', title: 'Settings', subKey: 'dash.settings.sub', subtitle: 'Shop, hours, keys', perm: 'shop.config', emoji: '⚙️' },
+  { href: '/contact', titleKey: 'dash.contact', title: 'Contact Details', subKey: 'dash.contact.sub', subtitle: 'Address, phone, map pin', perm: 'shop.config', emoji: '📇' },
+  { href: '/store', titleKey: 'dash.store', title: 'Store Configuration', subKey: 'dash.store.sub', subtitle: 'Hours, delivery, subscriptions', perm: 'shop.config', emoji: '🏪' },
+  { href: '/settings', titleKey: 'dash.settings', title: 'Settings', subKey: 'dash.settings.sub', subtitle: 'Language, logo, UPI', perm: 'shop.config', emoji: '⚙️' },
   { href: '/feedback', titleKey: 'dash.feedback', title: 'Feedback', subKey: 'dash.feedback.sub', subtitle: 'Reviews & ratings', perm: 'shop.config', emoji: '⭐' },
-  { href: '/roles', titleKey: 'dash.roles', title: 'Team & Roles', subKey: 'dash.roles.sub', subtitle: 'Assign roles', perm: 'roles.manage', emoji: '🧑‍💼' },
   { href: '/coupons', titleKey: 'dash.coupons', title: 'Coupons', subKey: 'dash.coupons.sub', subtitle: 'Discounts & offers', perm: 'sales.discount', emoji: '🏷️' },
+  { href: '/loyalty', titleKey: 'dash.loyalty', title: 'Loyalty & referrals', subKey: 'dash.loyalty.sub', subtitle: 'Points & invite rewards', perm: 'shop.config', emoji: '🎁' },
 ];
 
 function tsToDate(ts: { toDate: () => Date } | null | undefined): Date | null {
@@ -68,7 +71,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!canSeeOrders) return;
-    return subscribeOrders(shopId, setOrders);
+    // Bounded on purpose: the badge only ever counts orders still awaiting action, so there
+    // is no reason to stream the shop's entire history into the dashboard.
+    return subscribeOpenOrders(shopId, setOrders);
   }, [canSeeOrders]);
 
   // No role yet → access pending.
@@ -101,12 +106,13 @@ export default function Dashboard() {
 
   const visible = SECTIONS.filter((s) => userHasPermission(appUser, s.perm));
 
-  // "Open" = still needs someone to act on it. Served and cancelled are done.
-  const openOrders = orders.filter(
-    (o) => o.status !== 'served' && o.status !== 'cancelled',
-  ).length;
-  // New orders are the urgent subset, so they drive the badge colour.
+  // Every order on this feed is by definition still open; `new` is the urgent subset.
+  const openOrders = orders.length;
   const newOrders = orders.filter((o) => o.status === 'new').length;
+
+  // Stock needing a decision today: already sold out, or at/below its reorder level.
+  const { out: outOfStock, low: lowStock } = lowStockReport(products);
+  const stockAlerts = outOfStock.length + lowStock.length;
 
   return (
     <Screen>
@@ -126,6 +132,26 @@ export default function Dashboard() {
       </Card>
 
       <SectionTitle>{t('dash.manage', 'Manage')}</SectionTitle>
+      {canSeeInventory && stockAlerts > 0 ? (
+        <Link href={'/inventory?filter=low' as never} asChild>
+          <Pressable>
+            <Card style={{ backgroundColor: DANGER + '18', gap: Spacing.one }}>
+              <View style={styles.tileTop}>
+                <ThemedText type="smallBold" style={{ color: DANGER, flex: 1 }}>
+                  {t('dash.stockAlert', 'Stock needs attention')}
+                </ThemedText>
+                <Badge label={String(stockAlerts)} color={DANGER} />
+              </View>
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('dash.stockAlertHint', '{out} out of stock · {low} running low — tap to restock', {
+                  out: outOfStock.length,
+                  low: lowStock.length,
+                })}
+              </ThemedText>
+            </Card>
+          </Pressable>
+        </Link>
+      ) : null}
       {visible.length === 0 ? (
         <EmptyState title={t('dash.nothingTitle', 'Nothing to show')} hint={t('dash.nothingHint', 'Your role has no sections enabled.')} />
       ) : (
@@ -175,6 +201,38 @@ export default function Dashboard() {
               </Pressable>
             </Link>
           ))}
+          {userHasRole(appUser, 'superuser') ? (
+            <Link href={'/products/port' as never} asChild>
+              <Pressable style={{ flexBasis: '47%', flexGrow: 1 }}>
+                <Card style={{ gap: Spacing.one, minHeight: 96 }}>
+                  <ThemedText type="title" style={{ fontSize: 28, lineHeight: 34 }}>
+                    📤
+                  </ThemedText>
+                  <ThemedText type="smallBold">{t('dash.port', 'Import / Export')}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('dash.port.sub', 'Products via Excel')}
+                  </ThemedText>
+                </Card>
+              </Pressable>
+            </Link>
+          ) : null}
+
+          {userHasRole(appUser, 'superuser') ? (
+            <Link href={'/usage' as never} asChild>
+              <Pressable style={{ flexBasis: '47%', flexGrow: 1 }}>
+                <Card style={{ gap: Spacing.one, minHeight: 96 }}>
+                  <ThemedText type="title" style={{ fontSize: 28, lineHeight: 34 }}>
+                    📊
+                  </ThemedText>
+                  <ThemedText type="smallBold">{t('dash.usage', 'Firebase usage')}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('dash.usage.sub', 'Storage & document counts')}
+                  </ThemedText>
+                </Card>
+              </Pressable>
+            </Link>
+          ) : null}
+
           {userHasRole(appUser, 'superuser') ? (
             <Link href={'/purge' as never} asChild>
               <Pressable style={{ flexBasis: '47%', flexGrow: 1 }}>

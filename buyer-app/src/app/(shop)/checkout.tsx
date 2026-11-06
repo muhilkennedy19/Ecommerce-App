@@ -9,6 +9,8 @@ import {
   buildUpiUrl,
   isDivisibleUnit,
   isValidPhone,
+  loyaltyConfig,
+  quoteRedemption,
   qtyToSubUnits,
   sanitizePhone,
   saveAddresses,
@@ -103,6 +105,9 @@ export default function Checkout() {
   const [couponError, setCouponError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
 
+  // Loyalty redemption (opt-in per order).
+  const [redeemOn, setRedeemOn] = useState(false);
+
   // Delivery address + zone
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -175,7 +180,22 @@ export default function Checkout() {
   const serviceable = zone != null && zone.serviceable;
   const deliveryFee = zone != null && serviceable ? deliveryFeeFor(zone, subtotal) : 0;
   const defaultCoupons = coupons.filter((c) => c.active && c.showByDefault);
-  const grandTotal = appliedRes ? appliedRes.grandTotal : subtotal + deliveryFee;
+
+  // Points are a second discount stacked on top of any coupon. The quote re-runs whenever
+  // the cart changes, so the cap can never go stale behind an edit.
+  const loyalty = loyaltyConfig(shop?.loyalty);
+  const pointsBalance = customer?.loyaltyPoints ?? 0;
+  const redeemQuote = quoteRedemption(shop?.loyalty, pointsBalance, subtotal);
+  const redeemActive = redeemOn && redeemQuote.points > 0;
+  const loyaltyDiscount = redeemActive ? redeemQuote.rupees : 0;
+  const loyaltyPointsUsed = redeemActive ? redeemQuote.points : 0;
+
+  const grandTotal = Math.max(
+    0,
+    Math.round(
+      ((appliedRes ? appliedRes.grandTotal : subtotal + deliveryFee) - loyaltyDiscount) * 100,
+    ) / 100,
+  );
   const effectiveDeliveryFee = appliedRes ? appliedRes.deliveryFee : deliveryFee;
 
   // Whether the shop has a UPI VPA configured to accept UPI payments.
@@ -396,7 +416,8 @@ export default function Checkout() {
         pincode: selectedAddress.pincode,
         deliveryFee: appliedRes ? appliedRes.deliveryFee : deliveryFee,
         couponCode: appliedCoupon?.code ?? null,
-        discount: appliedRes?.discount ?? 0,
+        discount: (appliedRes?.discount ?? 0) + loyaltyDiscount,
+        loyaltyRedeemed: loyaltyPointsUsed,
         customerPhone: effectivePhone,
         paymentMode,
       });
@@ -774,6 +795,49 @@ export default function Checkout() {
             ) : null}
           </Card>
 
+          {loyalty.enabled && pointsBalance > 0 ? (
+            <>
+              <SectionTitle>{t('checkout.rewards', 'Rewards')}</SectionTitle>
+              <Card style={{ gap: Spacing.two }}>
+                <View style={styles.lineRow}>
+                  <ThemedText type="small" style={{ flex: 1 }}>
+                    {t('checkout.pointsBalance', 'You have {points} points', {
+                      points: pointsBalance,
+                    })}
+                  </ThemedText>
+                  <Badge label={`${pointsBalance}`} color={PRIMARY} />
+                </View>
+                {redeemQuote.points > 0 ? (
+                  <>
+                    <Button
+                      title={
+                        redeemOn
+                          ? t('checkout.pointsRemove', 'Remove points')
+                          : t('checkout.pointsUse', 'Use {points} points (−{value})', {
+                              points: redeemQuote.points,
+                              value: money(redeemQuote.rupees),
+                            })
+                      }
+                      variant="secondary"
+                      onPress={() => setRedeemOn((v) => !v)}
+                    />
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {t(
+                        'checkout.pointsCapHint',
+                        'Points can cover up to {percent}% of an order.',
+                        { percent: loyalty.maxRedeemPercent },
+                      )}
+                    </ThemedText>
+                  </>
+                ) : (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {redeemQuote.reason ?? ''}
+                  </ThemedText>
+                )}
+              </Card>
+            </>
+          ) : null}
+
           <SectionTitle>{t('checkout.totals', 'Totals')}</SectionTitle>
           <Card>
             <View style={styles.lineRow}>
@@ -789,6 +853,16 @@ export default function Checkout() {
                 </ThemedText>
                 <ThemedText type="small" style={{ color: SUCCESS }}>
                   −{money(appliedRes.discount)}
+                </ThemedText>
+              </View>
+            ) : null}
+            {loyaltyDiscount > 0 ? (
+              <View style={styles.lineRow}>
+                <ThemedText type="small" style={{ flex: 1 }}>
+                  {t('checkout.pointsApplied', 'Points ({points})', { points: loyaltyPointsUsed })}
+                </ThemedText>
+                <ThemedText type="small" style={{ color: SUCCESS }}>
+                  −{money(loyaltyDiscount)}
                 </ThemedText>
               </View>
             ) : null}

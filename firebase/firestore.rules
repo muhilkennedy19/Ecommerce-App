@@ -76,21 +76,55 @@ service cloud.firestore {
     }
 
     // ---- employees ----
-    // Employee managers manage all; an employee may update their own record (onboarding).
+    // Employee managers (and admins) manage all; an employee may update their own record (onboarding).
     match /employees/{id} {
-      allow read: if roleIn(['employee-manager', 'superuser']);
-      allow create, delete: if roleIn(['employee-manager', 'superuser']);
-      allow update: if roleIn(['employee-manager', 'superuser'])
+      allow read: if roleIn(['employee-manager', 'admin', 'superuser']);
+      allow create, delete: if roleIn(['employee-manager', 'admin', 'superuser']);
+      allow update: if roleIn(['employee-manager', 'admin', 'superuser'])
         || (isSignedIn() && resource.data.uid == request.auth.uid);
     }
 
     // ---- customers ----
     // Staff with customer access manage all; a buyer owns their own doc (id == uid).
+    //
+    // Loyalty is real money, so the wallet fields are NOT part of what a buyer may write:
+    // points are minted only by the admin app (which holds customers.write) when an order is
+    // served. A buyer's self-write must leave every wallet field byte-identical.
+    function selfReferralCode() {
+      return 'REF' + request.auth.uid[0:6].upper();
+    }
+    function touches(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+    function walletUnchanged() {
+      return !touches(['loyaltyPoints', 'referralSettled', 'referralCount']);
+    }
+    // A buyer may publish their own code, but only the one derived from their uid — this
+    // mirrors referralCodeFor() in common/src/util/loyalty.ts, so nobody can claim another
+    // person's code and divert their bonus.
+    function referralCodeOk() {
+      return !touches(['referralCode'])
+        || request.resource.data.referralCode == selfReferralCode();
+    }
+    // `referredBy` may be set once (entering a friend's code) but never changed afterwards,
+    // so a settled referral can't be re-pointed at someone else.
+    function referredByOk() {
+      return !touches(['referredBy'])
+        || !('referredBy' in resource.data)
+        || resource.data.referredBy == null;
+    }
     match /customers/{id} {
       allow read: if roleIn(['customer-manager', 'admin', 'superuser'])
         || (isSignedIn() && request.auth.uid == id);
-      allow write: if roleIn(['customer-manager', 'superuser'])
-        || (isSignedIn() && request.auth.uid == id);
+      allow create: if roleIn(['customer-manager', 'superuser'])
+        || (isSignedIn() && request.auth.uid == id
+            && !request.resource.data.keys().hasAny(['loyaltyPoints', 'referralSettled', 'referralCount'])
+            && (!('referralCode' in request.resource.data)
+                || request.resource.data.referralCode == selfReferralCode()));
+      allow update: if roleIn(['customer-manager', 'superuser'])
+        || (isSignedIn() && request.auth.uid == id
+            && walletUnchanged() && referralCodeOk() && referredByOk());
+      allow delete: if roleIn(['customer-manager', 'superuser']);
     }
 
     // ---- orders ----

@@ -243,7 +243,7 @@ export default function PosScreen() {
     setSaving(true);
     try {
       const grand = Math.round(total * 100) / 100;
-      const billId = await placePosSale({
+      const { id: billId, orderCode } = await placePosSale({
         shopId,
         operatorId: user.uid,
         operatorName: appUser?.name ?? null,
@@ -252,7 +252,11 @@ export default function PosScreen() {
         paymentMode: payMode,
       });
       await generateBill(billId, grand);
-      toast({ type: 'success', title: t('pos.saleSaved', 'Sale recorded'), message: money(grand) });
+      toast({
+        type: 'success',
+        title: t('pos.saleSaved', 'Sale recorded'),
+        message: `${money(grand)} · #${orderCode}`,
+      });
       setLines([]);
       setCustomerName('');
       setPayMode('cash');

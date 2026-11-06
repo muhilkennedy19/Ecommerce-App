@@ -39,6 +39,7 @@ interface ServiceAccount {
 type IncomingBody =
   | { event: "new-order"; shopId: string; orderId: string }
   | { event: "order-status"; customerId: string; status: string; orderId?: string }
+  | { event: "order-arriving"; customerId: string; orderId?: string }
   | { event: "back-in-stock"; shopId: string; productId: string; productName?: string }
   | { event: "broadcast"; shopId: string; title: string; body: string; productId?: string }
   | { event: "email"; to: string; subject: string; text: string; html?: string; fromName?: string };
@@ -47,6 +48,15 @@ interface Notification {
   title: string;
   body: string;
 }
+
+/** Friendly buyer-facing push copy per order status (order-status event). */
+const STATUS_MESSAGES: Record<string, Notification> = {
+  accepted: { title: "Order accepted", body: "Your order has been accepted and is being prepared." },
+  packed: { title: "Order packed 📦", body: "Your order is packed and waiting to be picked up by a delivery agent." },
+  out_for_delivery: { title: "Out for delivery 🛵", body: "Your order is on its way!" },
+  served: { title: "Order delivered ✓", body: "Your order has been delivered — enjoy!" },
+  cancelled: { title: "Order cancelled", body: "Your order has been cancelled." },
+};
 
 /** A recipient token plus the Firestore doc id it came from (for diagnostics). */
 interface Recipient {
@@ -123,13 +133,25 @@ export default {
         }
         case "order-status": {
           recipients = await getRecipientsForUser(ctx, body.customerId);
-          notification = {
+          notification = STATUS_MESSAGES[body.status] ?? {
             title: "Order update",
             body: `Your order is now ${body.status}`,
           };
           data = {
             event: "order-status",
             status: body.status,
+            ...(body.orderId ? { orderId: body.orderId } : {}),
+          };
+          break;
+        }
+        case "order-arriving": {
+          recipients = await getRecipientsForUser(ctx, body.customerId);
+          notification = {
+            title: "Your order has arrived! 🛵",
+            body: "Your delivery partner is at your doorstep — reaching you shortly!",
+          };
+          data = {
+            event: "order-arriving",
             ...(body.orderId ? { orderId: body.orderId } : {}),
           };
           break;
@@ -786,6 +808,7 @@ async function createOrderFromSubscription(
 
   const fields: Record<string, FirestoreValue> = {
     shopId: f.shopId ?? { nullValue: null },
+    orderCode: { stringValue: makeOrderCode() },
     customerId: { stringValue: customerId },
     customerName: nameVal,
     customerPhone: f.customerPhone ?? { nullValue: null },
@@ -939,6 +962,20 @@ function docId(name: string | undefined): string {
   if (!name) return "";
   const idx = name.lastIndexOf("/");
   return idx >= 0 ? name.slice(idx + 1) : name;
+}
+
+/**
+ * Random public order code (e.g. `mkenK7P3Q2`). Mirrors `makeOrderCode` in
+ * common/src/util/ordercode.ts — duplicated here because the Worker is a standalone bundle with
+ * no access to the app's shared code. Keep the alphabet/length in sync with that file.
+ */
+function makeOrderCode(): string {
+  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let suffix = "";
+  for (let i = 0; i < 6; i++) {
+    suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return "mken" + suffix;
 }
 
 // ---------------------------------------------------------------------------

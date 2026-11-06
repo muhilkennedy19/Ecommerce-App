@@ -65,9 +65,23 @@ export function effectivePrice(
   return Math.round(base * 100) / 100;
 }
 
+/**
+ * Whole-number "% off" for a discounted product, or `null` when there is no usable
+ * discount. Rounded so listings show a clean "20% OFF" badge.
+ */
+export function discountPercent(
+  product: Pick<Product, 'price' | 'discountPrice'>,
+): number | null {
+  const { price, discountPrice } = product;
+  if (discountPrice == null) return null;
+  if (!Number.isFinite(price) || !Number.isFinite(discountPrice)) return null;
+  if (price <= 0 || discountPrice >= price || discountPrice < 0) return null;
+  const pct = Math.round(((price - discountPrice) / price) * 100);
+  return pct > 0 ? pct : null;
+}
+
 /** True if the timestamp is not from the current local calendar day (drives daily reminders). */
-export function isStaleToday(updatedAt: Date | null | undefined, now: Date = new Date()): boolean {
-  if (!updatedAt) return true;
+export function isStaleToday(updatedAt: Date | null | undefined, now: Date = new Date()): boolean {  if (!updatedAt) return true;
   return (
     updatedAt.getFullYear() !== now.getFullYear() ||
     updatedAt.getMonth() !== now.getMonth() ||

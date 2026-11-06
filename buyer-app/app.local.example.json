@@ -1,3 +1,19 @@
 {
-  "notifyUrl": "https://<your-worker>.workers.dev"
+  "_README": [
+    "Copy this file to app.local.json (gitignored) before building locally.",
+    "app.config.js merges it into expo.extra, overriding app.json.",
+    "Resolution order: EAS env var > app.local.json > app.json.",
+    "Every key here is OPTIONAL - the app builds and runs without this file,",
+    "with push, email and remote logging degrading to a silent no-op.",
+    "Keys prefixed with _ are ignored at runtime and exist only as documentation."
+  ],
+
+  "_notifyUrl": "Cloudflare Worker that sends push + email. EAS env var: NOTIFY_URL",
+  "notifyUrl": "https://<your-worker>.workers.dev",
+
+  "_newRelicKey": "New Relic INGEST-LICENSE key (NOT a user key): one.newrelic.com > user menu > API keys > type 'INGEST - LICENSE'. Absent = logs stay on-device.",
+  "newRelicKey": "<40-char-ingest-license-key>",
+
+  "_newRelicRegion": "'us' (default) or 'eu' - must match your New Relic account data region, or ingest silently 403s.",
+  "newRelicRegion": "us"
 }

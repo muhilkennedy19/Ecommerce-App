@@ -15,7 +15,7 @@ import {
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Share, StyleSheet, View } from 'react-native';
 
 import { Badge, Button, DANGER, EmptyState, PRIMARY, Screen } from '@/components/kit';
 import { ProductReviews } from '@/components/product-reviews';
@@ -55,7 +55,29 @@ export default function ProductDetail() {
 
   const product = products.find((p) => p.id === id) ?? null;
   // Hook must run unconditionally; it tolerates an undefined/null image id.
+  // The detail screen is the one place that genuinely wants the full-size image.
   const uri = useCachedImage(product?.imageId);
+
+  /**
+   * Share the product by name and price, plus the Play Store link when the shop has
+   * published the app. There is no public web catalogue to deep-link into, so the install
+   * link is the only thing a recipient without the app can actually act on.
+   */
+  const shareProduct = () => {
+    if (!product) return;
+    const lines = [
+      t('product.shareLine', '{name} — {price} at {shop}', {
+        name: product.name,
+        price: formatUnitPrice(effectivePrice(product), product.unit),
+        shop: shop?.name ?? t('common.ourShop', 'our shop'),
+      }),
+    ];
+    const store = shop?.playStoreUrl?.trim();
+    if (store) lines.push(t('product.shareInstall', 'Order it here: {url}', { url: store }));
+    void Share.share({ message: lines.join('\n\n') }).catch(() => {
+      // sheet dismissed — nothing to report
+    });
+  };
 
   const productId = product?.id;
 
@@ -189,6 +211,12 @@ export default function ProductDetail() {
         title={t('common.addToCart', 'Add to cart')}
         disabled={!canAdd}
         onPress={() => cart.add({ productId: product.id, name: product.name, price, unit: product.unit })}
+      />
+
+      <Button
+        title={t('product.share', 'Share this product')}
+        variant="secondary"
+        onPress={shareProduct}
       />
 
       <ProductReviews productId={product.id} />

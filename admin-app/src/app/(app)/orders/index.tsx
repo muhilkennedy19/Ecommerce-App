@@ -8,22 +8,29 @@ import {
   getIdToken,
   getShop,
   ORDER_STATUS_LABELS,
+  orderDisplayCode,
+  orderMatchesCode,
   PAYMENT_MODE_LABELS,
   PAYMENT_STATUS_LABELS,
   sendEmail,
   sendNotify,
+  setOrderCourier,
   setOrderPaymentVerified,
+  setOrderRunningLate,
   setOrderStatus,
+  settleLoyaltyForOrder,
   subscribeOrders,
+  fetchOrdersPage,
   userHasPermission,
   userHasRole,
   type Address,
   type Order,
   type OrderStatus,
+  type OrdersPage,
   type PaymentStatus,
 } from '@common';
 import { router, Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 
 import {
@@ -37,15 +44,19 @@ import {
   Screen,
   SectionTitle,
   SUCCESS,
+  SwitchRow,
+  TextField,
 } from '@/components/kit';
 import { useConfirm, useToast } from '@/components/feedback';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { notifyUrl, shopId } from '@/lib/config';
+import { logError } from '@/lib/logging';
 import { useT } from '@/lib/i18n';
 
 const ACCEPTED_COLOR = '#F5A623';
+const PACKED_COLOR = '#12A594';
 const OUT_FOR_DELIVERY_COLOR = '#8E4EC6';
 
 /**
@@ -83,6 +94,23 @@ function emailThanksOnServe(action: Promise<unknown>, order: Order): void {
   void emailCustomerAfter(action, order, buildOrderServedEmail);
 }
 
+/**
+ * Credit the buyer's loyalty points once the order is actually served. Fire-and-forget:
+ * loyalty is a reward, never a reason to block fulfilment, so every failure (loyalty off,
+ * POS sale, missing customer doc, offline) degrades to a silent no-op. Settlement itself is
+ * idempotent — the order's `loyaltyEarned` stamp stops a repeat tap paying twice.
+ */
+function settleLoyaltyOnServe(action: Promise<unknown>, order: Order): void {
+  void (async () => {
+    try {
+      await action;
+      await settleLoyaltyForOrder(shopId, order);
+    } catch {
+      // never surface a loyalty failure into the order UI
+    }
+  })();
+}
+
 /** Shared runner: await the action, resolve the customer's email + shop name, send. */
 async function emailCustomerAfter(
   action: Promise<unknown>,
@@ -111,6 +139,7 @@ async function emailCustomerAfter(
 export const STATUS_COLOR: Record<OrderStatus, string> = {
   new: PRIMARY,
   accepted: ACCEPTED_COLOR,
+  packed: PACKED_COLOR,
   out_for_delivery: OUT_FOR_DELIVERY_COLOR,
   served: SUCCESS,
   cancelled: DANGER,
@@ -120,7 +149,7 @@ function formatTimestamp(ts: Order['createdAt']): string {
   return ts ? ts.toDate().toLocaleString() : '—';
 }
 
-const ACTIVE_STATUSES: OrderStatus[] = ['new', 'accepted', 'out_for_delivery'];
+const ACTIVE_STATUSES: OrderStatus[] = ['new', 'accepted', 'packed', 'out_for_delivery'];
 
 /**
  * Whether a non-admin order-server (e.g. sales) may see this order in their list:
@@ -307,12 +336,26 @@ function UnverifiedPaymentWarning({ order }: Readonly<{ order: Order }>) {
   );
 }
 
+/** Size of the realtime head and of each "load older" page. */
+const LIVE_WINDOW = 25;
+const PAGE_SIZE = 25;
+
 export default function OrdersScreen() {
   const { appUser } = useAuth();
   const t = useT();
   const confirm = useConfirm();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const toast = useToast();
+  // The newest LIVE_WINDOW orders stay on a realtime listener (new orders must appear
+  // instantly); everything older is fetched on demand. Subscribing to the whole collection
+  // re-downloaded the shop's entire history on every single write.
+  const [liveOrders, setLiveOrders] = useState<Order[]>([]);
+  const [olderOrders, setOlderOrders] = useState<Order[]>([]);
+  const [cursor, setCursor] = useState<OrdersPage['cursor']>(undefined);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  /** Free-text order-code search over the loaded orders. */
+  const [search, setSearch] = useState('');
 
   const canRead = userHasPermission(appUser, 'orders.read');
   const canServe = userHasPermission(appUser, 'orders.serve');
@@ -322,11 +365,43 @@ export default function OrdersScreen() {
 
   useEffect(() => {
     if (!canRead) return;
-    return subscribeOrders(shopId, (o) => {
-      setOrders(o);
-      setLoaded(true);
-    });
+    return subscribeOrders(
+      shopId,
+      (o) => {
+        setLiveOrders(o);
+        setLoaded(true);
+      },
+      undefined,
+      LIVE_WINDOW,
+    );
   }, [canRead]);
+
+  // Live head wins on conflicts: it carries the freshest copy of any order in both sets.
+  const orders = useMemo(() => {
+    const byId = new Map<string, Order>();
+    for (const o of olderOrders) byId.set(o.id, o);
+    for (const o of liveOrders) byId.set(o.id, o);
+    return [...byId.values()].sort(
+      (a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0),
+    );
+  }, [liveOrders, olderOrders]);
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      // The first page overlaps the live window; the id-keyed merge above absorbs that.
+      const page = await fetchOrdersPage(shopId, PAGE_SIZE, cursor);
+      setOlderOrders((prev) => [...prev, ...page.orders]);
+      setCursor(page.cursor);
+      setHasMore(page.hasMore);
+    } catch (e) {
+      logError('orders.loadMore', e);
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   if (!canRead) {
     return (
@@ -347,8 +422,10 @@ export default function OrdersScreen() {
   }
 
   // Orders this user may see in the list (full history for admins; active + own-served otherwise).
-  const visibleOrders = fullHistory ? orders : orders.filter((o) => isVisibleToServer(o, appUser?.uid));
-  const newOrders = visibleOrders.filter((o) => o.status === 'new');
+  const roleVisible = fullHistory ? orders : orders.filter((o) => isVisibleToServer(o, appUser?.uid));
+  const newOrders = roleVisible.filter((o) => o.status === 'new');
+  // Apply the order-code search on top (client-side over what's loaded).
+  const visibleOrders = roleVisible.filter((o) => orderMatchesCode(o, search));
 
   async function confirmCancel(order: Order) {
     const ok = await confirm({
@@ -405,8 +482,22 @@ export default function OrdersScreen() {
       ) : null}
 
       <SectionTitle>{t('orders.all', 'All orders')}</SectionTitle>
+      <TextField
+        value={search}
+        onChangeText={setSearch}
+        placeholder={t('orders.searchPlaceholder', 'Search by Order ID')}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
       {visibleOrders.length === 0 ? (
-        <EmptyState title={t('orders.noneTitle', 'No orders yet')} hint={t('orders.noneHint', 'Incoming orders will show up here.')} />
+        <EmptyState
+          title={search.trim() ? t('orders.noMatchTitle', 'No matching orders') : t('orders.noneTitle', 'No orders yet')}
+          hint={
+            search.trim()
+              ? t('orders.noMatchHint', 'No loaded order matches that ID. Load older orders and try again.')
+              : t('orders.noneHint', 'Incoming orders will show up here.')
+          }
+        />
       ) : (
         visibleOrders.map((order) => (
           <Pressable key={order.id} onPress={() => router.push(('/orders/' + order.id) as never)}>
@@ -415,6 +506,10 @@ export default function OrdersScreen() {
                 <ThemedText type="smallBold">{order.customerName ?? t('common.customer', 'Customer')}</ThemedText>
                 <Badge label={ORDER_STATUS_LABELS[order.status]} color={STATUS_COLOR[order.status]} />
               </View>
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('orders.idLabel', 'Order ID')}: #{orderDisplayCode(order)}
+                {order.channel === 'pos' ? ' · POS' : ''}
+              </ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
                 {itemsSummary(order)}
               </ThemedText>
@@ -444,6 +539,7 @@ export default function OrdersScreen() {
               (canServe &&
                 (order.status === 'new' ||
                   order.status === 'accepted' ||
+                  order.status === 'packed' ||
                   order.status === 'out_for_delivery')) ? (
                 <View style={{ flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' }}>
                   {order.customerPhone ? (
@@ -467,16 +563,35 @@ export default function OrdersScreen() {
                   {canServe && order.status === 'accepted' ? (
                     <View style={{ flex: 1 }}>
                       <Button
-                        title={t('orders.outForDelivery', 'Out for delivery')}
+                        title={t('orders.markPacked', 'Mark packed')}
                         disabled={!appUser}
                         onPress={() =>
                           appUser &&
                           notifyOnStatus(
-                            setOrderStatus(order.id, 'out_for_delivery', { uid: appUser.uid, name: appUser.name }),
+                            setOrderStatus(order.id, 'packed', { uid: appUser.uid, name: appUser.name }),
                             order,
-                            'out_for_delivery',
+                            'packed',
                           )
                         }
+                      />
+                    </View>
+                  ) : null}
+                  {canServe && order.status === 'packed' ? (
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        title={t('orders.outForDelivery', 'Out for delivery')}
+                        disabled={!appUser}
+                        onPress={() => {
+                          if (!appUser) return;
+                          // Whoever dispatches the order becomes its courier; their device then
+                          // streams location to it (see useCourierTracking).
+                          const go = setOrderStatus(order.id, 'out_for_delivery', {
+                            uid: appUser.uid,
+                            name: appUser.name,
+                          });
+                          void setOrderCourier(order.id, { uid: appUser.uid, name: appUser.name });
+                          notifyOnStatus(go, order, 'out_for_delivery');
+                        }}
                       />
                     </View>
                   ) : null}
@@ -490,6 +605,7 @@ export default function OrdersScreen() {
                           const served = setOrderStatus(order.id, 'served', { uid: appUser.uid, name: appUser.name });
                           notifyOnStatus(served, order, 'served');
                           emailThanksOnServe(served, order);
+                          settleLoyaltyOnServe(served, order);
                         }}
                       />
                     </View>
@@ -497,6 +613,7 @@ export default function OrdersScreen() {
                   {canServe &&
                   (order.status === 'new' ||
                     order.status === 'accepted' ||
+                    order.status === 'packed' ||
                     order.status === 'out_for_delivery') ? (
                     <View style={{ flex: 1 }}>
                       <Button title={t('orders.reject', 'Reject')} variant="danger" onPress={() => void confirmCancel(order)} />
@@ -504,10 +621,41 @@ export default function OrdersScreen() {
                   ) : null}
                 </View>
               ) : null}
+
+              {canServe && (order.status === 'accepted' || order.status === 'packed' || order.status === 'out_for_delivery') ? (
+                <SwitchRow
+                  label={t('orders.runningLate', 'Running late')}
+                  value={!!order.runningLate}
+                  onValueChange={(v) =>
+                    void setOrderRunningLate(order.id, v).catch((e: unknown) => {
+                      logError('orders.runningLate', e, { orderId: order.id });
+                      toast({
+                        type: 'error',
+                        title: t('common.updateFailed', 'Update failed'),
+                        message: String(e),
+                      });
+                    })
+                  }
+                />
+              ) : null}
             </Card>
           </Pressable>
         ))
       )}
+
+      {visibleOrders.length > 0 && hasMore ? (
+        <Button
+          title={t('orders.loadMore', 'Load older orders')}
+          variant="secondary"
+          onPress={() => void loadMore()}
+          loading={loadingMore}
+        />
+      ) : null}
+      {visibleOrders.length > 0 && !hasMore ? (
+        <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
+          {t('orders.endOfHistory', 'That’s the whole order history.')}
+        </ThemedText>
+      ) : null}
     </Screen>
   );
 }

@@ -1,4 +1,4 @@
-import { addAnnouncement, fuzzyFilter, getIdToken, putImage, getPushToken, rolesOf, sendNotify, setPushNotify, subscribeProducts, userHasPermission, type Product } from '@common';
+import { addAnnouncement, DEFAULT_ANNOUNCEMENT_TTL_HOURS, DEFAULT_ARRIVAL_RADIUS_METERS, DEFAULT_COURIER_MIN_MOVE_METERS, fuzzyFilter, getIdToken, putImage, getPushToken, rolesOf, sendNotify, setPushNotify, subscribeProducts, subscribeShop, updateShop, userHasPermission, userHasRole, type Product } from '@common';
 import { Image } from 'expo-image';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
@@ -45,9 +45,11 @@ export default function NotificationsScreen() {
   const inited = useRef(false);
 
   const canBroadcast = userHasPermission(appUser, 'shop.config');
+  const isSuperuser = userHasRole(appUser, 'superuser');
   const theme = useTheme();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [ttlHours, setTtlHours] = useState(String(DEFAULT_ANNOUNCEMENT_TTL_HOURS));
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
 
@@ -56,10 +58,52 @@ export default function NotificationsScreen() {
   const [productQuery, setProductQuery] = useState('');
   const [productId, setProductId] = useState<string | null>(null);
 
+  // Superuser-only courier tuning (shop-wide): write/read throttle + arrival-push radius.
+  const [courierMin, setCourierMin] = useState('');
+  const [courierArrival, setCourierArrival] = useState('');
+  const [savingMin, setSavingMin] = useState(false);
+  const shopInited = useRef(false);
+
   useEffect(() => {
     if (!canBroadcast) return;
     return subscribeProducts(shopId, setProducts);
   }, [canBroadcast]);
+
+  useEffect(() => {
+    if (!isSuperuser) return;
+    return subscribeShop(shopId, (s) => {
+      if (s && !shopInited.current) {
+        shopInited.current = true;
+        setCourierMin(s.courierMinMoveMeters != null ? String(s.courierMinMoveMeters) : '');
+        setCourierArrival(s.arrivalRadiusMeters != null ? String(s.arrivalRadiusMeters) : '');
+      }
+    });
+  }, [isSuperuser]);
+
+  async function saveCourierMin() {
+    setSavingMin(true);
+    try {
+      const parse = (v: string) => (v.trim() ? Math.max(1, Math.round(Number(v) || 0)) : null);
+      const move = parse(courierMin);
+      const arrival = parse(courierArrival);
+      await updateShop(shopId, { courierMinMoveMeters: move, arrivalRadiusMeters: arrival });
+      setCourierMin(move != null ? String(move) : '');
+      setCourierArrival(arrival != null ? String(arrival) : '');
+      toast({
+        type: 'success',
+        title: t('common.saved', 'Saved ✓'),
+        message: t('notif.courierMinSaved', 'Courier update distance saved.'),
+      });
+    } catch {
+      toast({
+        type: 'error',
+        title: t('common.couldNotSave', 'Could not save'),
+        message: t('common.tryAgain', 'Please try again.'),
+      });
+    } finally {
+      setSavingMin(false);
+    }
+  }
 
   const selectedProduct = products.find((p) => p.id === productId) ?? null;
   const productMatches = useMemo(() => {
@@ -145,6 +189,7 @@ export default function NotificationsScreen() {
         productId,
         active: true,
         createdBy: user.uid,
+        ttlHours: ttlHours.trim() ? Math.max(1, Math.round(Number(ttlHours) || 0)) : DEFAULT_ANNOUNCEMENT_TTL_HOURS,
       });
       // Fire the broadcast push (best-effort). The token fetch is guarded so a transient
       // token-refresh failure can't turn an already-saved announcement into a failure toast
@@ -226,6 +271,16 @@ export default function NotificationsScreen() {
               multiline
               placeholder={t('broadcast.bodyPlaceholder', '20% off all flowers until 5pm.')}
             />
+            <TextField
+              label={t('broadcast.ttlLabel', 'Show on Home for (hours)')}
+              value={ttlHours}
+              onChangeText={setTtlHours}
+              keyboardType="numeric"
+              placeholder={String(DEFAULT_ANNOUNCEMENT_TTL_HOURS)}
+            />
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('broadcast.ttlHint', 'The banner auto-hides after this. New customers never see expired banners.')}
+            </ThemedText>
             {pickedUri ? (
               <Image source={{ uri: pickedUri }} style={styles.preview} contentFit="cover" />
             ) : null}
@@ -283,6 +338,43 @@ export default function NotificationsScreen() {
                 loading={publishing}
                 disabled={!title.trim() || !body.trim()}
               />
+            </View>
+          </Card>
+        </>
+      ) : null}
+
+      {isSuperuser ? (
+        <>
+          <SectionTitle>{t('notif.tracking', 'Live delivery tracking')}</SectionTitle>
+          <Card style={{ gap: Spacing.two }}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t(
+                'notif.courierMinHint',
+                'How far a courier must move before their location is re-sent to the customer. Higher = fewer writes. Default 20 m.',
+              )}
+            </ThemedText>
+            <TextField
+              label={t('notif.courierMinLabel', 'Minimum courier move (metres)')}
+              value={courierMin}
+              onChangeText={setCourierMin}
+              keyboardType="numeric"
+              placeholder={String(DEFAULT_COURIER_MIN_MOVE_METERS)}
+            />
+            <ThemedText type="small" themeColor="textSecondary">
+              {t(
+                'notif.arrivalRadiusHint',
+                'How close (metres) the courier must get to the delivery pin before the customer is pushed “reaching your doorstep”. Default 20 m.',
+              )}
+            </ThemedText>
+            <TextField
+              label={t('notif.arrivalRadiusLabel', 'Arrival radius (metres)')}
+              value={courierArrival}
+              onChangeText={setCourierArrival}
+              keyboardType="numeric"
+              placeholder={String(DEFAULT_ARRIVAL_RADIUS_METERS)}
+            />
+            <View style={{ alignSelf: 'flex-start' }}>
+              <Button title={t('common.save', 'Save')} onPress={() => void saveCourierMin()} loading={savingMin} />
             </View>
           </Card>
         </>

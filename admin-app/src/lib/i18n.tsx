@@ -48,7 +48,7 @@ const en: Record<string, string> = {
   'common.tryAgain': 'Please try again.',
 
   // sign-in
-  'signin.brand': 'Seller',
+  'signin.brand': 'MKEN ECommerce Admin',
   'signin.brandSub': 'Admin',
   'signin.setupTitle': 'Setup required',
   'signin.setupHint':
@@ -108,7 +108,11 @@ const en: Record<string, string> = {
   'dash.analytics': 'Analytics',
   'dash.analytics.sub': 'Trends & export',
   'dash.settings': 'Settings',
-  'dash.settings.sub': 'Shop, hours, keys',
+  'dash.settings.sub': 'Language, logo, UPI',
+  'dash.contact': 'Contact Details',
+  'dash.contact.sub': 'Address, phone, map pin',
+  'dash.store': 'Store Configuration',
+  'dash.store.sub': 'Hours, delivery, subscriptions',
   'dash.roles': 'Team & Roles',
   'dash.roles.sub': 'Assign roles',
   'dash.coupons': 'Coupons',
@@ -211,6 +215,7 @@ const en: Record<string, string> = {
 
   // contact details
   'settings.contactDetails': 'Contact details',
+  'settings.storeConfig': 'Store configuration',
   'settings.contactHint': 'Shown to buyers on the Contact us tab of the buyer app.',
   'settings.tagline': 'Tagline',
   'settings.taglinePlaceholder': 'Fresh groceries, delivered daily',
@@ -431,6 +436,20 @@ const en: Record<string, string> = {
   'orders.accept': 'Accept',
   'orders.reject': 'Reject',
   'orders.outForDelivery': 'Out for delivery',
+  'orders.markPacked': 'Mark packed',
+  'orders.runningLate': 'Running late',
+  'order.runningLate': 'Running late',
+  'order.runningLateHint': 'Turn on if this order is delayed — the customer sees a “Running late” badge.',
+  'notif.tracking': 'Live delivery tracking',
+  'notif.courierMinLabel': 'Minimum courier move (metres)',
+  'notif.courierMinHint': 'How far a courier must move before their location is re-sent to the customer. Higher = fewer writes. Default 20 m.',
+  'notif.courierMinSaved': 'Courier update distance saved.',
+  'notif.arrivalRadiusLabel': 'Arrival radius (metres)',
+  'notif.arrivalRadiusHint': 'How close (metres) the courier must get to the delivery pin before the customer is pushed “reaching your doorstep”. Default 20 m.',
+  'track.permTitle': 'Location needed',
+  'track.permMsg': 'Allow location so customers can follow their delivery on the map.',
+  'track.fgTitle': 'Sharing delivery location',
+  'track.fgBody': 'Your location is shared with the customer while you deliver.',
   'orders.markServed': 'Mark served',
   'orders.cancelBtn': 'Cancel',
 
@@ -469,6 +488,8 @@ const en: Record<string, string> = {
   'employees.inviteHint':
     'Email delivery is stubbed on Spark — real email sending needs a server. For now, share the onboarding token shown after inviting.',
   'employees.team': 'Team',
+  'employees.teamRoles': 'Team & Roles',
+  'employees.teamRolesHint': 'Grant roles and manage who can access what.',
   'employees.noneTitle': 'No employees yet',
   'employees.noneHint': 'Invite someone to get started.',
   'employees.missingDetails': 'Missing details',
@@ -478,7 +499,7 @@ const en: Record<string, string> = {
   'employees.inviteFailed': 'Invite failed',
   'emp.inviteSubject': "You've been invited to the shop team",
   'emp.inviteBody':
-    'Hi {name},\n\nYou have been invited to join the shop team. Open the Seller app, sign in with this email ({email}) using Google, and you will be granted access.\n\nOnboarding code: {token}\n\nThanks.',
+    'Hi {name},\n\nYou have been invited to join the shop team. Open the MKEN ECommerce Admin app, sign in with this email ({email}) using Google, and you will be granted access.\n\nOnboarding code: {token}\n\nThanks.',
   'emp.inviteEmailed': 'Invite email sent to {email}',
   'emp.inviteShareManually':
     "Couldn't email the invite. Share this onboarding code with the employee: {token}",
@@ -689,7 +710,7 @@ const ta: Record<string, string> = {
   'common.tryAgain': 'மீண்டும் முயற்சிக்கவும்.',
 
   // sign-in
-  'signin.brand': 'விற்பனையாளர்',
+  'signin.brand': 'MKEN ECommerce Admin',
   'signin.brandSub': 'நிர்வாகம்',
   'signin.setupTitle': 'அமைப்பு தேவை',
   'signin.setupHint':
@@ -714,7 +735,11 @@ const ta: Record<string, string> = {
   'dash.analytics': 'பகுப்பாய்வு',
   'dash.analytics.sub': 'போக்குகள் & ஏற்றுமதி',
   'dash.settings': 'அமைப்புகள்',
-  'dash.settings.sub': 'கடை, நேரம், விசைகள்',
+  'dash.settings.sub': 'மொழி, லோகோ, UPI',
+  'dash.contact': 'தொடர்பு விவரங்கள்',
+  'dash.contact.sub': 'முகவரி, தொலைபேசி, வரைபட இடம்',
+  'dash.store': 'கடை அமைவாக்கம்',
+  'dash.store.sub': 'நேரம், டெலிவரி, சந்தாக்கள்',
   'dash.roles': 'குழு & பங்குகள்',
   'dash.roles.sub': 'பங்குகளை ஒதுக்கு',
   'dash.coupons': 'கூப்பன்கள்',
@@ -795,6 +820,7 @@ const ta: Record<string, string> = {
 
   // contact details
   'settings.contactDetails': 'தொடர்பு விவரங்கள்',
+  'settings.storeConfig': 'கடை அமைவாக்கம்',
   'settings.contactHint': 'வாங்குபவர் ஆப்பின் தொடர்பு தாவலில் காட்டப்படும்.',
   'settings.tagline': 'குறிக்கோள் வாசகம்',
   'settings.taglinePlaceholder': 'புதிய மளிகை, தினமும் டெலிவரி',
@@ -1013,6 +1039,20 @@ const ta: Record<string, string> = {
   'orders.accept': 'ஏற்றுக்கொள்',
   'orders.reject': 'நிராகரி',
   'orders.outForDelivery': 'விநியோகத்திற்கு வெளியே',
+  'orders.markPacked': 'பேக் செய்யப்பட்டது',
+  'orders.runningLate': 'தாமதமாகிறது',
+  'order.runningLate': 'தாமதமாகிறது',
+  'order.runningLateHint': 'இந்த ஆர்டர் தாமதமானால் இதை இயக்கவும் — வாடிக்கையாளருக்கு “தாமதமாகிறது” பேட்ஜ் தெரியும்.',
+  'notif.tracking': 'நேரடி டெலிவரி கண்காணிப்பு',
+  'notif.courierMinLabel': 'குறைந்தபட்ச டெலிவரி நகர்வு (மீட்டர்)',
+  'notif.courierMinHint': 'வாடிக்கையாளருக்கு இடம் மீண்டும் அனுப்பப்படும் முன் டெலிவரி நபர் எவ்வளவு நகர வேண்டும். அதிகம் = குறைவான எழுத்துகள். இயல்பு 20 மீ.',
+  'notif.courierMinSaved': 'டெலிவரி புதுப்பிப்பு தூரம் சேமிக்கப்பட்டது.',
+  'notif.arrivalRadiusLabel': 'வருகை ஆரம் (மீட்டர்)',
+  'notif.arrivalRadiusHint': 'வாடிக்கையாளருக்கு “வீட்டு வாசலை அடைகிறோம்” அறிவிப்பு அனுப்பப்படும் முன் டெலிவரி நபர் டெலிவரி இடத்திற்கு எவ்வளவு அருகில் வர வேண்டும் (மீட்டர்). இயல்பு 20 மீ.',
+  'track.permTitle': 'இருப்பிடம் தேவை',
+  'track.permMsg': 'வாடிக்கையாளர்கள் தங்கள் டெலிவரியை வரைபடத்தில் பின்தொடர இருப்பிடத்தை அனுமதிக்கவும்.',
+  'track.fgTitle': 'டெலிவரி இருப்பிடம் பகிரப்படுகிறது',
+  'track.fgBody': 'நீங்கள் டெலிவரி செய்யும்போது உங்கள் இருப்பிடம் வாடிக்கையாளருடன் பகிரப்படுகிறது.',
   'orders.markServed': 'வழங்கப்பட்டதாகக் குறி',
   'orders.cancelBtn': 'ரத்து செய்',
 
@@ -1051,6 +1091,8 @@ const ta: Record<string, string> = {
   'employees.inviteHint':
     'Spark இல் மின்னஞ்சல் விநியோகம் நிறுத்தப்பட்டுள்ளது — உண்மையான மின்னஞ்சல் அனுப்புவதற்கு ஒரு சர்வர் தேவை. தற்போதைக்கு, அழைத்த பிறகு காட்டப்படும் சேர்க்கை டோக்கனைப் பகிரவும்.',
   'employees.team': 'குழு',
+  'employees.teamRoles': 'குழு & பங்குகள்',
+  'employees.teamRolesHint': 'பங்குகளை வழங்கி யார் எதை அணுகலாம் என்பதை நிர்வகிக்கவும்.',
   'employees.noneTitle': 'இன்னும் ஊழியர்கள் இல்லை',
   'employees.noneHint': 'தொடங்க யாரையாவது அழைக்கவும்.',
   'employees.missingDetails': 'விவரங்கள் இல்லை',
@@ -1060,7 +1102,7 @@ const ta: Record<string, string> = {
   'employees.inviteFailed': 'அழைப்பு தோல்வியடைந்தது',
   'emp.inviteSubject': 'கடைக் குழுவில் சேர உங்களுக்கு அழைப்பு விடுக்கப்பட்டுள்ளது',
   'emp.inviteBody':
-    'வணக்கம் {name},\n\nகடைக் குழுவில் சேர உங்களுக்கு அழைப்பு விடுக்கப்பட்டுள்ளது. Seller செயலியைத் திறந்து, இந்த மின்னஞ்சல் ({email}) மூலம் Google ஐப் பயன்படுத்தி உள்நுழைந்தால் உங்களுக்கு அணுகல் வழங்கப்படும்.\n\nசேர்க்கை குறியீடு: {token}\n\nநன்றி.',
+    'வணக்கம் {name},\n\nகடைக் குழுவில் சேர உங்களுக்கு அழைப்பு விடுக்கப்பட்டுள்ளது. MKEN ECommerce Admin செயலியைத் திறந்து, இந்த மின்னஞ்சல் ({email}) மூலம் Google ஐப் பயன்படுத்தி உள்நுழைந்தால் உங்களுக்கு அணுகல் வழங்கப்படும்.\n\nசேர்க்கை குறியீடு: {token}\n\nநன்றி.',
   'emp.inviteEmailed': 'அழைப்பு மின்னஞ்சல் {email} க்கு அனுப்பப்பட்டது',
   'emp.inviteShareManually':
     'அழைப்பை மின்னஞ்சல் செய்ய முடியவில்லை. இந்த சேர்க்கை குறியீட்டை ஊழியருடன் பகிரவும்: {token}',

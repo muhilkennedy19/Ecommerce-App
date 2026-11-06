@@ -70,6 +70,7 @@ export function roundMoney(n: number): number {
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   new: 'New',
   accepted: 'Accepted',
+  packed: 'Packed',
   out_for_delivery: 'Out for delivery',
   served: 'Served',
   cancelled: 'Cancelled',
@@ -81,6 +82,8 @@ export function nextOrderStatus(status: OrderStatus): OrderStatus | null {
     case 'new':
       return 'accepted';
     case 'accepted':
+      return 'packed';
+    case 'packed':
       return 'out_for_delivery';
     case 'out_for_delivery':
       return 'served';

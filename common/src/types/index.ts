@@ -47,6 +47,35 @@ export interface OperatingHours {
   days: Record<Weekday, OperatingDay>;
 }
 
+/**
+ * Shop-wide loyalty + referral settings. Points are minted only by the admin app when an
+ * order reaches `served`, so every number here is a seller-controlled policy, never a
+ * buyer-supplied one.
+ */
+export interface LoyaltyConfig {
+  /** Master switch for earning + redeeming points. Off = buyers see nothing about loyalty. */
+  enabled: boolean;
+  /**
+   * Referral programme switch, independent of `enabled`. The buyer app only reveals the
+   * "invite a friend" card and the referral-code box when this is on.
+   */
+  referralsEnabled: boolean;
+  /** Points earned per ₹100 of order value (e.g. 5 → ₹500 order earns 25 points). */
+  earnPerHundred: number;
+  /** Orders below this subtotal (₹) earn nothing. 0 = every order earns. */
+  minOrderToEarn: number;
+  /** Rupee value of one point when redeemed (e.g. 1 → 100 points = ₹100 off). */
+  rupeesPerPoint: number;
+  /** Buyer must hold at least this many points before redeeming anything. */
+  minRedeemPoints: number;
+  /** Hard cap on how much of an order's subtotal points may cover, 0–100. */
+  maxRedeemPercent: number;
+  /** One-off bonus to the referrer when their invitee's first order is served. */
+  referrerBonus: number;
+  /** One-off bonus to the new buyer when their first order is served. */
+  refereeBonus: number;
+}
+
 export interface Shop {
   id: string;
   name: string;
@@ -58,6 +87,18 @@ export interface Shop {
    * 0/absent = subscriptions disabled.
    */
   subscriptionMinOrder?: number | null;
+  /**
+   * Minimum distance (metres) a courier device must move before it writes a new location to
+   * the order it is delivering. Throttles live-tracking writes to keep Firestore cheap.
+   * Superuser-tunable (Notifications screen). Absent/null ⇒ `DEFAULT_COURIER_MIN_MOVE_METERS`.
+   */
+  courierMinMoveMeters?: number | null;
+  /**
+   * Radius (metres) within which a delivering courier is treated as "arrived" at the buyer's
+   * address, firing the one-time doorstep push. Superuser-tunable (Notifications screen).
+   * Absent/null ⇒ `DEFAULT_ARRIVAL_RADIUS_METERS`.
+   */
+  arrivalRadiusMeters?: number | null;
   operatingHours: OperatingHours;
   /** When true, the shop is closed regardless of the schedule (manual override). */
   forceClosed?: boolean;
@@ -80,6 +121,17 @@ export interface Shop {
   /** Shop location pin (WGS84); lets buyers open directions in their maps app. */
   lat?: number | null;
   lng?: number | null;
+  /** Loyalty + referral policy. Absent = loyalty disabled. */
+  loyalty?: LoyaltyConfig | null;
+  /**
+   * Public Play Store listing for the BUYER app, set once it is published. Appended to the
+   * referral share message so an invited friend can install it; absent = share the code only.
+   */
+  playStoreUrl?: string | null;
+  /** Printed on invoices when set (e.g. "29ABCDE1234F1Z5"). */
+  gstin?: string | null;
+  /** Running counter behind `Order.invoiceNo`; incremented transactionally. */
+  invoiceSeq?: number | null;
   createdAt?: Timestamp;
 }
 
@@ -103,6 +155,12 @@ export interface PrepTime {
   unit: PrepUnit;
 }
 
+/**
+ * Hard cap on the buyer home "Featured" row. The row is a non-virtualised horizontal
+ * ScrollView, so every extra card is an eagerly-mounted image — keep it small.
+ */
+export const MAX_FEATURED_PRODUCTS = 10;
+
 export interface Product {
   id: string;
   shopId: string;
@@ -115,6 +173,12 @@ export interface Product {
   unit?: ProductUnit | null;
   /** Id of an `images/{id}` doc holding the base64 image (Spark-friendly, no Cloud Storage). */
   imageId?: string | null;
+  /**
+   * Tiny inline preview (a complete `data:image/jpeg;base64,...` URI, a few KB) stored on the
+   * product doc itself. Lists render this; the full `imageId` blob is fetched only when a
+   * detail/edit screen actually needs it. Keeps a 500-SKU catalogue cheap to paint.
+   */
+  thumb?: string | null;
   active: boolean;
 
   /** Highlighted on the buyer home "Featured" row. */
@@ -131,6 +195,11 @@ export interface Product {
   trackStock: boolean;
   stock?: number | null;
   stockUpdatedAt?: Timestamp | null;
+  /**
+   * Stock level at/below which the item is flagged as running low (admin dashboard badge +
+   * daily alert). Only meaningful when `trackStock` is on. Absent/null = no alerting.
+   */
+  reorderLevel?: number | null;
 
   /**
    * Fixed-quantity (packaged) item: even for a divisible unit (kg/litre), buyer/POS may only
@@ -198,6 +267,22 @@ export interface Customer {
   notifyBackInStock?: string[];
   locale?: string | null;
   uid?: string | null;
+
+  /**
+   * Loyalty wallet balance in points. Written ONLY by the admin app (which holds
+   * `customers.write`) when an order is served — Security Rules forbid a buyer from
+   * changing their own balance, otherwise points would be free to mint.
+   */
+  loyaltyPoints?: number;
+  /** Stable share code this buyer hands to friends (uppercase, derived from their uid). */
+  referralCode?: string | null;
+  /** `referralCode` of the buyer who referred this one. Set once, at sign-up/first order. */
+  referredBy?: string | null;
+  /** True once the referral bonus has been paid out, so it can never be granted twice. */
+  referralSettled?: boolean;
+  /** How many friends this buyer has successfully referred (for display). */
+  referralCount?: number;
+
   createdAt?: Timestamp;
 }
 
@@ -210,7 +295,7 @@ export interface DeliveryZone {
   freeAbove: number;
 }
 
-export type OrderStatus = 'new' | 'accepted' | 'out_for_delivery' | 'served' | 'cancelled';
+export type OrderStatus = 'new' | 'accepted' | 'packed' | 'out_for_delivery' | 'served' | 'cancelled';
 
 /** How the order is paid. UPI is a deep-link flow reconciled manually (not auto-verified). */
 export type PaymentMode = 'cod' | 'upi' | 'cash' | 'card';
@@ -246,6 +331,12 @@ export interface OrderStatusEntry {
 
 export interface Order {
   id: string;
+  /**
+   * Public, human-friendly order code (e.g. `mkenK7P3Q2`), shown to buyers and sellers as the
+   * "Order ID". Random; the Firestore doc `id` remains the internal key. Absent on orders
+   * created before codes existed (display falls back to a slice of `id`).
+   */
+  orderCode?: string | null;
   shopId: string;
   customerId: string;
   customerName?: string;
@@ -266,6 +357,30 @@ export interface Order {
   address?: Address | null; // snapshot at order time
   pincode?: string | null;
   status: OrderStatus;
+  /**
+   * Set by the sales/delivery person when an in-progress order is running behind schedule.
+   * Buyers see a "Running late" badge instead of the default "On time". Only meaningful while
+   * the order is `accepted`/`out_for_delivery`; absent/false = on time.
+   */
+  runningLate?: boolean;
+  /**
+   * Live courier tracking. When an order goes `out_for_delivery`, the staff member who did it
+   * becomes the courier (`courierId`/`courierName`) and their device streams its position here
+   * (`courierLat`/`courierLng`, with `courierUpdatedAt` an epoch-ms client stamp). The buyer's
+   * track-on-map screen reads these live. Absent until a first fix is written; writes are
+   * throttled by `Shop.courierMinMoveMeters`.
+   */
+  courierId?: string | null;
+  courierName?: string | null;
+  courierLat?: number | null;
+  courierLng?: number | null;
+  courierUpdatedAt?: number | null;
+  /**
+   * Epoch-ms stamp set once, by the courier device, when it first comes within the shop's
+   * arrival radius of the delivery address — its presence is the idempotency marker that stops
+   * the "reaching your doorstep" push firing more than once.
+   */
+  arrivalNotifiedAt?: number | null;
   /** True once stock was decremented for this order (on accept); drives restock-on-cancel. */
   stockApplied?: boolean;
   assignedTo?: string | null; // employee uid who picked up the order
@@ -275,6 +390,15 @@ export interface Order {
   statusLog?: OrderStatusEntry[];
   /** Net change to grandTotal since the buyer placed it (+ pay more / − refund). */
   amountDelta?: number;
+  /**
+   * Loyalty points granted for this order. Stamped by the admin app when the order is
+   * served; its presence is what stops the same order paying out twice.
+   */
+  loyaltyEarned?: number;
+  /** Loyalty points the buyer spent on this order (already reflected in `discount`). */
+  loyaltyRedeemed?: number;
+  /** Sequential human-readable bill number, assigned on first invoice generation. */
+  invoiceNo?: string | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -405,6 +529,12 @@ export interface Announcement {
   /** Optional product this announcement links to (buyer taps through to it). */
   productId?: string | null;
   active: boolean;
+  /**
+   * When this banner stops showing on the buyer Home (buyers filter it out past this).
+   * Set from the admin's chosen TTL at creation; absent on legacy docs, which fall back to
+   * `createdAt + DEFAULT_ANNOUNCEMENT_TTL_HOURS`. See `isAnnouncementLive`.
+   */
+  expiresAt?: Timestamp | null;
   createdBy?: string | null;
   createdAt?: Timestamp;
 }

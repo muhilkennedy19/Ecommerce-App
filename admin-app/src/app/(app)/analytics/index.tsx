@@ -1,9 +1,11 @@
 import {
+  fetchOrdersInRange,
   subscribeOrders,
   subscribeProducts,
   userHasPermission,
   type Order,
   type OrderStatus,
+  type PaymentMode,
   type Product,
 } from '@common';
 import { Stack } from 'expo-router';
@@ -30,6 +32,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { shopId } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
+import { logError } from '@/lib/logging';
 import { useT } from '@/lib/i18n';
 
 type RangePreset = '7' | '30' | 'all';
@@ -100,12 +103,15 @@ export default function Analytics() {
   const [productQuery, setProductQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+  const [dayClosing, setDayClosing] = useState(false);
 
   const canRead = userHasPermission(appUser, 'analytics.read');
 
   useEffect(() => {
     if (!canRead) return;
-    const unsubOrders = subscribeOrders(shopId, setOrders);
+    // Bounded: the charts cover a rolling window, and the day-close report fetches its own
+    // exact range. Streaming the full order history here was the single biggest read cost.
+    const unsubOrders = subscribeOrders(shopId, setOrders, undefined, 500);
     const unsubProducts = subscribeProducts(shopId, setProducts);
     return () => {
       unsubOrders();
@@ -300,6 +306,98 @@ export default function Analytics() {
       if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri);
     } catch (e) {
       toast({ type: 'error', title: t('analytics.exportFailed', 'Export failed'), message: String(e) });
+    }
+  }
+
+  /**
+   * End-of-day reconciliation: everything taken today, split by channel (online vs POS)
+   * and by payment mode, so the drawer and the UPI statement can be checked against the
+   * app before closing up. Fetched fresh rather than read off the live feed so the numbers
+   * are a stable snapshot of a fixed window.
+   */
+  async function exportDayClose() {
+    setDayClosing(true);
+    try {
+      const from = new Date();
+      from.setHours(0, 0, 0, 0);
+      const to = new Date();
+      to.setHours(23, 59, 59, 999);
+      const todays = await fetchOrdersInRange(shopId, from, to);
+
+      const billable = todays.filter((o) => o.status !== 'cancelled');
+      const cancelled = todays.filter((o) => o.status === 'cancelled');
+      const pos = billable.filter((o) => o.channel === 'pos');
+      const online = billable.filter((o) => o.channel !== 'pos');
+
+      const sum = (list: Order[]) => list.reduce((s, o) => s + (o.grandTotal ?? o.total ?? 0), 0);
+      const byMode = (mode: PaymentMode) => billable.filter((o) => (o.paymentMode ?? 'cod') === mode);
+
+      // Cash actually in the drawer = counter cash + delivered COD.
+      const cashModes = [...byMode('cash'), ...byMode('cod').filter((o) => o.status === 'served')];
+      const codPending = byMode('cod').filter((o) => o.status !== 'served');
+      const upi = byMode('upi');
+      const card = byMode('card');
+      const upiUnverified = upi.filter((o) => (o.paymentStatus ?? 'pending') !== 'verified');
+
+      const row = (label: string, count: number, amount: number, note = '') =>
+        `<tr><td>${esc(label)}</td><td style="text-align:center">${count}</td><td style="text-align:right">${fmtMoney(amount)}</td><td>${esc(note)}</td></tr>`;
+
+      const html = `<html><head><meta charset="utf-8"><style>
+        body{font-family:-apple-system,Roboto,sans-serif;padding:24px;color:#111}
+        h1{font-size:20px;margin:0} h2{font-size:14px;margin:20px 0 6px;color:#444}
+        .sub{color:#666;font-size:12px;margin-top:4px}
+        table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px}
+        th,td{border:1px solid #ddd;padding:6px;text-align:left}
+        th{background:#f3f3f3}
+        tfoot td{font-weight:700;background:#fafafa}
+        .warn{color:#b35c00}
+        .sign{margin-top:36px;display:flex;justify-content:space-between;font-size:12px;color:#444}
+      </style></head><body>
+        <h1>${esc(t('analytics.dayCloseTitle', 'Day close report'))}</h1>
+        <div class="sub">${esc(from.toLocaleDateString())} · ${esc(t('analytics.generated', 'Generated'))} ${esc(new Date().toLocaleString())}</div>
+
+        <h2>${esc(t('analytics.byChannel', 'By channel'))}</h2>
+        <table>
+          <thead><tr><th>${esc(t('analytics.channel', 'Channel'))}</th><th style="text-align:center">${esc(t('analytics.orders', 'Orders'))}</th><th style="text-align:right">${esc(t('analytics.amount', 'Amount'))}</th><th>${esc(t('analytics.note', 'Note'))}</th></tr></thead>
+          <tbody>
+            ${row(t('analytics.online', 'Online'), online.length, sum(online))}
+            ${row(t('analytics.pos', 'POS / counter'), pos.length, sum(pos))}
+          </tbody>
+          <tfoot>${row(t('analytics.total', 'Total'), billable.length, sum(billable))}</tfoot>
+        </table>
+
+        <h2>${esc(t('analytics.byPayment', 'By payment mode'))}</h2>
+        <table>
+          <thead><tr><th>${esc(t('analytics.mode', 'Mode'))}</th><th style="text-align:center">${esc(t('analytics.orders', 'Orders'))}</th><th style="text-align:right">${esc(t('analytics.amount', 'Amount'))}</th><th>${esc(t('analytics.note', 'Note'))}</th></tr></thead>
+          <tbody>
+            ${row(t('analytics.cashDrawer', 'Cash (counter + delivered COD)'), cashModes.length, sum(cashModes), t('analytics.countDrawer', 'Count against the drawer'))}
+            ${row('UPI', upi.length, sum(upi), upiUnverified.length ? t('analytics.upiUnverified', '{n} not yet verified', { n: upiUnverified.length }) : '')}
+            ${row(t('analytics.card', 'Card'), card.length, sum(card))}
+            ${row(t('analytics.codPending', 'COD not yet delivered'), codPending.length, sum(codPending), t('analytics.notCollected', 'Not collected yet'))}
+          </tbody>
+        </table>
+
+        <h2>${esc(t('analytics.exceptions', 'Exceptions'))}</h2>
+        <table>
+          <tbody>
+            ${row(t('analytics.cancelledOrders', 'Cancelled orders'), cancelled.length, sum(cancelled), t('analytics.excluded', 'Excluded from totals'))}
+          </tbody>
+        </table>
+
+        <div class="sign">
+          <div>${esc(t('analytics.countedBy', 'Counted by'))}: ______________________</div>
+          <div>${esc(t('analytics.signature', 'Signature'))}: ______________________</div>
+        </div>
+      </body></html>`;
+
+      const { uri } = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri);
+      else await Print.printAsync({ uri });
+    } catch (e) {
+      logError('analytics.dayClose', e);
+      toast({ type: 'error', title: t('analytics.exportFailed', 'Export failed'), message: String(e) });
+    } finally {
+      setDayClosing(false);
     }
   }
 
@@ -517,6 +615,21 @@ export default function Analytics() {
           <Button title={t('analytics.exportExcel', 'Export Excel')} variant="secondary" onPress={() => void exportExcel()} />
         </View>
       </View>
+
+      <SectionTitle>{t('analytics.dayClose', 'Day close')}</SectionTitle>
+      <Card style={{ gap: Spacing.two }}>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t(
+            'analytics.dayCloseHint',
+            "Today's takings split by channel and payment mode, with a line to sign off against the cash drawer.",
+          )}
+        </ThemedText>
+        <Button
+          title={t('analytics.generateDayClose', 'Generate day-close report')}
+          onPress={() => void exportDayClose()}
+          loading={dayClosing}
+        />
+      </Card>
 
       <SectionTitle>{t('analytics.orderHistory', 'Order history')}</SectionTitle>
       {filtered.length === 0 ? (

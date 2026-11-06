@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Animated,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -24,10 +25,15 @@ export function Screen({
   children,
   scroll = true,
   style,
+  onRefresh,
+  refreshing = false,
 }: {
   children: ReactNode;
   scroll?: boolean;
   style?: ViewStyle;
+  /** Supply to enable pull-to-refresh (scrolling screens only). */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const theme = useTheme();
   const inner = (
@@ -39,6 +45,16 @@ export function Screen({
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={theme.textSecondary}
+                colors={[PRIMARY]}
+              />
+            ) : undefined
+          }
         >
           {inner}
         </ScrollView>

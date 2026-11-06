@@ -3,17 +3,19 @@ import {
   deleteCategory,
   describeExpiry,
   describePrep,
+  discountPercent,
   effectivePrice,
   fuzzyFilter,
   userHasPermission,
   subscribeCategories,
   subscribeProducts,
+  MAX_FEATURED_PRODUCTS,
   type Category,
   type Product,
 } from '@common';
 import { Stack, router } from 'expo-router';
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -26,6 +28,7 @@ import {
   PRIMARY,
   Screen,
   SectionTitle,
+  SUCCESS,
   TextField,
 } from '@/components/kit';
 import { useConfirm, useToast } from '@/components/feedback';
@@ -56,6 +59,11 @@ export default function ProductsScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'priceAsc' | 'priceDesc'>('name');
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [featuredOnly, setFeaturedOnly] = useState(false);
+
+  // Keeps typing smooth once the catalogue is large: the fuzzy filter + list re-render
+  // run against the deferred text instead of blocking every keystroke.
+  const deferredSearch = useDeferredValue(search);
 
   const canRead = userHasPermission(appUser, 'products.read');
   const canWriteProducts = userHasPermission(appUser, 'products.write');
@@ -77,21 +85,33 @@ export default function ProductsScreen() {
   );
 
   const filtered = useMemo(
-    () => fuzzyFilter(byCategory, search, (p) => [p.name, p.description]),
-    [byCategory, search],
+    () => fuzzyFilter(byCategory, deferredSearch, (p) => [p.name, p.description]),
+    [byCategory, deferredSearch],
   );
 
-  // In-stock filter + chosen sort, applied client-side over the in-memory catalog.
+  // Featured items are capped (see MAX_FEATURED_PRODUCTS) because the buyer home row is
+  // not virtualised — surface the count so the seller can turn extras off.
+  const featuredCount = useMemo(
+    () => products.filter((p) => p.featured).length,
+    [products],
+  );
+
+  // In-stock / featured filters + chosen sort, applied client-side over the in-memory catalog.
   const shown = useMemo(() => {
-    const list = inStockOnly
-      ? filtered.filter((p) => !p.trackStock || (p.stock ?? 0) > 0)
-      : filtered;
+    const list =
+      inStockOnly || featuredOnly
+        ? filtered.filter((p) => {
+            if (inStockOnly && p.trackStock && (p.stock ?? 0) <= 0) return false;
+            if (featuredOnly && !p.featured) return false;
+            return true;
+          })
+        : filtered;
     const sorted = [...list];
     if (sortBy === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
     else if (sortBy === 'priceAsc') sorted.sort((a, b) => effectivePrice(a) - effectivePrice(b));
     else sorted.sort((a, b) => effectivePrice(b) - effectivePrice(a));
     return sorted;
-  }, [filtered, inStockOnly, sortBy]);
+  }, [filtered, inStockOnly, featuredOnly, sortBy]);
 
   if (!canRead) {
     return (
@@ -224,7 +244,21 @@ export default function ProductsScreen() {
                     selected={inStockOnly}
                     onPress={() => setInStockOnly((v) => !v)}
                   />
+                  <Pill
+                    label={t('products.featuredOnly', 'Featured ({count})', { count: featuredCount })}
+                    selected={featuredOnly}
+                    onPress={() => setFeaturedOnly((v) => !v)}
+                  />
                 </View>
+                {featuredCount > MAX_FEATURED_PRODUCTS ? (
+                  <ThemedText type="small" style={{ color: DANGER }}>
+                    {t(
+                      'products.featuredOverLimit',
+                      'Only the first {max} featured products show on the buyer home. Turn some off.',
+                      { max: MAX_FEATURED_PRODUCTS },
+                    )}
+                  </ThemedText>
+                ) : null}
               </Card>
             ) : null}
           </View>
@@ -249,7 +283,11 @@ export default function ProductsScreen() {
 function ProductRow({ product: p }: Readonly<{ product: Product }>) {
   const theme = useTheme();
   const t = useT();
-  const uri = useCachedImage(p.imageId);
+  // Prefer the few-KB inline thumb stored on the product doc; only products saved before
+  // thumbnails existed still pay for the full `images/{id}` fetch.
+  const cached = useCachedImage(p.thumb ? null : p.imageId);
+  const uri = p.thumb ?? cached;
+  const offPct = discountPercent(p);
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/products/edit', params: { id: p.id } } as never)}
@@ -274,6 +312,9 @@ function ProductRow({ product: p }: Readonly<{ product: Product }>) {
                   {money(p.price)}
                 </ThemedText>
                 <ThemedText type="smallBold">{money(p.discountPrice)}</ThemedText>
+                {offPct != null ? (
+                  <Badge label={t('products.percentOff', '{pct}% OFF', { pct: offPct })} color={SUCCESS} />
+                ) : null}
               </>
             ) : (
               <ThemedText type="smallBold">{money(p.price)}</ThemedText>
@@ -281,6 +322,7 @@ function ProductRow({ product: p }: Readonly<{ product: Product }>) {
           </View>
           <View style={styles.badgeRow}>
             {!p.active ? <Badge label={t('products.inactive', 'Inactive')} color={DANGER} /> : null}
+            {p.featured ? <Badge label={t('products.featured', 'Featured')} color={PRIMARY} /> : null}
             {p.perishable ? <Badge label={t('products.perishable', 'Perishable')} /> : null}
             {p.onDemand ? (
               <Badge label={p.prepTime ? describePrep(p.prepTime) : t('products.onDemand', 'On demand')} />
@@ -353,7 +395,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   thumb: { width: 56, height: 56, borderRadius: Spacing.two },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  priceRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.two },
   struck: { textDecorationLine: 'line-through' },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
 });

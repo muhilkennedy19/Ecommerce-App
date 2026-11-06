@@ -1,15 +1,18 @@
 import {
   describeExpiry,
   describePrep,
+  discountPercent,
   effectivePrice,
   formatUnitPrice,
   fuzzyFilter,
+  isAnnouncementLive,
   shopAcceptsOrders,
   subscribeAnnouncements,
   subscribeCategories,
   subscribeProducts,
   subscribeShop,
   subscribeShopReviews,
+  MAX_FEATURED_PRODUCTS,
   type Announcement,
   type Category,
   type Product,
@@ -19,11 +22,11 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { router, Tabs } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Badge, Button, Card, DANGER, EmptyState, Loader, PRIMARY, SectionTitle, TextField } from '@/components/kit';
+import { Badge, Button, Card, DANGER, EmptyState, Loader, PRIMARY, SectionTitle, SUCCESS, TextField } from '@/components/kit';
 import { OccasionLogo } from '@/components/occasion-logo';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -52,6 +55,9 @@ export default function Home() {
   const [loaded, setLoaded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  // Keeps typing responsive on large catalogues — the fuzzy filter and list re-render run
+  // against the deferred text rather than on every keystroke.
+  const deferredSearch = useDeferredValue(search);
   const [searchOpen, setSearchOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'priceAsc' | 'priceDesc'>('name');
@@ -69,7 +75,13 @@ export default function Home() {
   useEffect(() => subscribeShop(shopId, setShop), []);
   useEffect(() => subscribeCategories(shopId, setCategories), []);
   useEffect(() => subscribeShopReviews(shopId, setReviews), []);
-  useEffect(() => subscribeAnnouncements(shopId, setAnnouncements), []);
+  // Drop banners past their TTL as they arrive (not in render — keeps this side-effect-free for
+  // react-hooks/purity). The subscription re-fires on any change, and the 30s auto-dismiss below
+  // handles a banner that ages out mid-session; a fresh mount re-filters anyway.
+  useEffect(
+    () => subscribeAnnouncements(shopId, (list) => setAnnouncements(list.filter((a) => isAnnouncementLive(a, Date.now())))),
+    [],
+  );
   useEffect(() => {
     AsyncStorage.getItem('dismissedAnnouncements')
       .then((raw) => {
@@ -97,7 +109,12 @@ export default function Home() {
   const logoUri = useShopLogo();
   const iconEffect = useShopIconEffect();
 
-  const featured = useMemo(() => products.filter((p) => p.active && p.featured), [products]);
+  // The "Featured" row is a plain horizontal ScrollView, so every card (and its image)
+  // mounts eagerly — hard-cap it instead of rendering whatever the shop has flagged.
+  const featured = useMemo(
+    () => products.filter((p) => p.active && p.featured).slice(0, MAX_FEATURED_PRODUCTS),
+    [products],
+  );
 
   // Per-product average rating + count, grouped from the shop's reviews (client-side).
   const ratings = useMemo(() => {
@@ -123,6 +140,23 @@ export default function Home() {
       return next;
     });
 
+  // Auto-clear broadcast announcements 30s after they appear on Home, so the card doesn't
+  // linger. Keyed on the id set (not array identity) so repeat Firestore emissions don't
+  // keep resetting the timer; dismissal persists, same as tapping ✕.
+  const visibleIds = visibleAnnouncements.map((a) => a.id).join(',');
+  useEffect(() => {
+    if (!visibleIds) return;
+    const ids = visibleIds.split(',');
+    const timer = setTimeout(() => {
+      setDismissed((prev) => {
+        const next = Array.from(new Set([...prev, ...ids]));
+        AsyncStorage.setItem('dismissedAnnouncements', JSON.stringify(next)).catch(() => {});
+        return next;
+      });
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [visibleIds]);
+
   const byCategory = useMemo(
     () =>
       products.filter(
@@ -132,8 +166,8 @@ export default function Home() {
   );
 
   const visible = useMemo(
-    () => fuzzyFilter(byCategory, search, (p) => [p.name, p.description]),
-    [byCategory, search],
+    () => fuzzyFilter(byCategory, deferredSearch, (p) => [p.name, p.description]),
+    [byCategory, deferredSearch],
   );
 
   // Apply the in-stock filter + chosen sort on top of search/category (client-side; the
@@ -412,9 +446,13 @@ function ProductCard({
 }) {
   const theme = useTheme();
   const t = useT();
-  const uri = useCachedImage(product.imageId);
+  // Inline thumb first (a few KB on the product doc); the full image is only fetched for
+  // older products that predate thumbnails, and on the detail screen.
+  const cached = useCachedImage(product.thumb ? null : product.imageId);
+  const uri = product.thumb ?? cached;
   const effective = effectivePrice(product);
   const hasDiscount = effective < product.price;
+  const offPct = discountPercent(product);
   const outOfStock = product.trackStock && (product.stock ?? 0) <= 0;
 
   const hints: string[] = [];
@@ -442,6 +480,9 @@ function ProductCard({
               <ThemedText type="small" themeColor="textSecondary" style={styles.struck}>
                 {money(product.price)}
               </ThemedText>
+            ) : null}
+            {offPct != null ? (
+              <Badge label={t('home.percentOff', '{pct}% OFF', { pct: offPct })} color={SUCCESS} />
             ) : null}
           </View>
           {hints.map((h) => (
@@ -486,9 +527,11 @@ function FeaturedCard({
 }) {
   const theme = useTheme();
   const t = useT();
-  const uri = useCachedImage(product.imageId);
+  const cached = useCachedImage(product.thumb ? null : product.imageId);
+  const uri = product.thumb ?? cached;
   const effective = effectivePrice(product);
   const hasDiscount = effective < product.price;
+  const offPct = discountPercent(product);
   const outOfStock = product.trackStock && (product.stock ?? 0) <= 0;
 
   return (
@@ -519,6 +562,9 @@ function FeaturedCard({
             >
               {money(product.price)}
             </ThemedText>
+          ) : null}
+          {offPct != null ? (
+            <Badge label={t('home.percentOff', '{pct}% OFF', { pct: offPct })} color={SUCCESS} />
           ) : null}
         </View>
       </Pressable>

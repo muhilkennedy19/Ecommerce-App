@@ -1,8 +1,12 @@
 import {
   addProduct,
+  barcodeForProduct,
+  buildBarcodeLabelsHtml,
   deleteImage,
   deleteProduct,
+  generateEan13,
   getIdToken,
+  getShop,
   userHasPermission,
   isDivisibleUnit,
   PRODUCT_UNITS,
@@ -12,6 +16,7 @@ import {
   subscribeProducts,
   UNIT_LABELS,
   updateProduct,
+  MAX_FEATURED_PRODUCTS,
   type Barcode,
   type Category,
   type PrepUnit,
@@ -24,9 +29,11 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import {
@@ -48,6 +55,7 @@ import { useCachedImage } from '@/hooks/use-cached-image';
 import { useTheme } from '@/hooks/use-theme';
 import { shopId, notifyUrl } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
+import { logError } from '@/lib/logging';
 import { useT } from '@/lib/i18n';
 
 /** Resize + JPEG-compress a local image to a base64 string (no data-URI prefix). */
@@ -58,6 +66,30 @@ async function compressToBase64(uri: string): Promise<string> {
   const out = await ref.saveAsync({ compress: 0.5, format: SaveFormat.JPEG, base64: true });
   if (!out.base64) throw new Error('Could not process the selected image.');
   return out.base64;
+}
+
+/**
+ * Build the tiny inline preview stored on the product doc itself (`Product.thumb`).
+ *
+ * Lists render this instead of fetching the full `images/{id}` blob, which is the
+ * difference between a few KB and up to 900 KB per row. 128px wide at quality 0.4 lands
+ * around 3–5 KB — comfortably inside Firestore's 1 MiB document limit even alongside the
+ * rest of the product fields.
+ */
+async function buildThumb(uri: string): Promise<string | null> {
+  try {
+    const ctx = ImageManipulator.manipulate(uri);
+    ctx.resize({ width: 128 });
+    const ref = await ctx.renderAsync();
+    const out = await ref.saveAsync({ compress: 0.4, format: SaveFormat.JPEG, base64: true });
+    if (!out.base64) return null;
+    const uriOut = `data:image/jpeg;base64,${out.base64}`;
+    // Guard against a surprisingly large result rather than risking the doc write.
+    return uriOut.length > 40_000 ? null : uriOut;
+  } catch {
+    // A missing thumb is cosmetic: the list falls back to the full cached image.
+    return null;
+  }
 }
 
 export default function EditProductScreen() {
@@ -79,10 +111,13 @@ export default function EditProductScreen() {
   const [unit, setUnit] = useState<ProductUnit | null>(null);
 
   const [imageId, setImageId] = useState<string | null>(null);
+  const [thumb, setThumb] = useState<string | null>(null);
   const [pickedUri, setPickedUri] = useState<string | null>(null);
 
   const [active, setActive] = useState(true);
   const [featured, setFeatured] = useState(false);
+  /** Ids of every currently-featured product, used to enforce MAX_FEATURED_PRODUCTS. */
+  const [featuredIds, setFeaturedIds] = useState<string[]>([]);
   const [perishable, setPerishable] = useState(false);
 
   const [hasExpiry, setHasExpiry] = useState(false);
@@ -91,6 +126,7 @@ export default function EditProductScreen() {
 
   const [trackStock, setTrackStock] = useState(false);
   const [stock, setStock] = useState('');
+  const [reorderLevel, setReorderLevel] = useState('');
   // Packaged item: block custom weight entry even for divisible units (kg/litre).
   const [fixedQty, setFixedQty] = useState(false);
 
@@ -116,11 +152,13 @@ export default function EditProductScreen() {
     return subscribeCategories(shopId, setCats);
   }, [canWrite]);
 
-  // Populate the form once from the live product when editing.
+  // Populate the form once from the live product when editing. The same feed also tracks
+  // how many products are already featured, so the cap can be enforced on create too.
   useEffect(() => {
-    if (!canWrite || !id) return;
+    if (!canWrite) return;
     return subscribeProducts(shopId, (list) => {
-      if (loadedRef.current) return;
+      setFeaturedIds(list.filter((x) => x.featured).map((x) => x.id));
+      if (!id || loadedRef.current) return;
       const p = list.find((x) => x.id === id);
       if (!p) return;
       loadedRef.current = true;
@@ -132,6 +170,7 @@ export default function EditProductScreen() {
       setDiscountPrice(p.discountPrice != null ? String(p.discountPrice) : '');
       setUnit(p.unit ?? null);
       setImageId(p.imageId ?? null);
+      setThumb(p.thumb ?? null);
       setActive(p.active);
       setFeatured(!!p.featured);
       setPerishable(p.perishable);
@@ -141,6 +180,7 @@ export default function EditProductScreen() {
       }
       setTrackStock(p.trackStock);
       setStock(p.stock != null ? String(p.stock) : '');
+      setReorderLevel(p.reorderLevel != null ? String(p.reorderLevel) : '');
       setFixedQty(!!p.fixedQty);
       setBarcodes(p.barcodes ?? []);
       setOnDemand(p.onDemand);
@@ -154,6 +194,29 @@ export default function EditProductScreen() {
   // Resolve the preview image before any conditional return so hook order stays stable.
   const cachedUri = useCachedImage(imageId);
   const previewUri = pickedUri ?? cachedUri;
+
+  // How many *other* products hold a featured slot; the buyer home only renders the first
+  // MAX_FEATURED_PRODUCTS, so refuse to create a slot that would never be shown.
+  const featuredOthers = useMemo(
+    () => featuredIds.filter((x) => x !== id).length,
+    [featuredIds, id],
+  );
+
+  const onToggleFeatured = (next: boolean) => {
+    if (next && featuredOthers >= MAX_FEATURED_PRODUCTS) {
+      toast({
+        type: 'error',
+        title: t('product.featuredLimit', 'Featured limit reached'),
+        message: t(
+          'product.featuredLimitHint',
+          'Only {max} products can be featured. Turn one off from the Products list first.',
+          { max: MAX_FEATURED_PRODUCTS },
+        ),
+      });
+      return;
+    }
+    setFeatured(next);
+  };
 
   if (!canWrite) {
     return (
@@ -176,6 +239,55 @@ export default function EditProductScreen() {
 
   // --- Barcode inventory helpers ---
   const barcodeTotal = barcodes.reduce((sum, b) => sum + (b.qty || 0), 0);
+
+  /**
+   * Mint an in-house EAN-13 for a product with no manufacturer barcode. The code is derived
+   * from the product id (or a fresh random seed for an unsaved product) so re-generating on
+   * the same product is idempotent rather than producing a new sticker every tap.
+   */
+  const generateInHouseBarcode = () => {
+    const code = id ? barcodeForProduct(id) : generateEan13(Math.floor(Math.random() * 1e10));
+    if (barcodes.some((b) => b.code === code)) {
+      toast({
+        type: 'info',
+        title: t('product.barcodeExists', 'Already added'),
+        message: t('product.barcodeExistsHint', 'This product already has that barcode.'),
+      });
+      return;
+    }
+    setBarcodes((prev) => [...prev, { code, qty: 0 }]);
+    toast({
+      type: 'success',
+      title: t('product.barcodeGenerated', 'Barcode generated'),
+      message: code,
+    });
+  };
+
+  /** Render the product's barcodes as a printable label sheet. */
+  const printLabels = async () => {
+    try {
+      const shop = await getShop(shopId);
+      const html = buildBarcodeLabelsHtml({
+        labels: barcodes.map((b) => ({
+          code: b.code,
+          name: name.trim() || t('product.untitled', 'Untitled product'),
+          price: Number(price) || null,
+        })),
+        shopName: shop?.name ?? null,
+        copiesEach: 1,
+      });
+      const { uri } = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri);
+      else await Print.printAsync({ uri });
+    } catch (e) {
+      logError('product.printLabels', e);
+      toast({
+        type: 'error',
+        title: t('product.printFailed', 'Could not print'),
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  };
 
   const openScanner = async () => {
     if (!camPerm?.granted) {
@@ -257,7 +369,17 @@ export default function EditProductScreen() {
     const cleanBarcodes = barcodes
       .filter((b) => b.code)
       .map((b) => ({ code: b.code, qty: Math.max(0, Math.floor(b.qty || 0)) }));
-    const useBarcodes = cleanBarcodes.length > 0;
+    // Blank reorder level = no low-stock alerting for this item.
+    const reorderRaw = reorderLevel.trim();
+    const reorderLevelNum = reorderRaw ? Math.max(0, Math.floor(Number(reorderRaw))) : null;
+    if (reorderRaw && !Number.isFinite(Number(reorderRaw))) {
+      toast({
+        type: 'error',
+        title: t('product.invalidReorder', 'Invalid reorder level'),
+        message: t('product.invalidReorderHint', 'Enter a whole number, or leave it blank.'),
+      });
+      return;
+    }    const useBarcodes = cleanBarcodes.length > 0;
     const effTrackStock = useBarcodes ? true : trackStock;
     const effStock = useBarcodes
       ? cleanBarcodes.reduce((s, b) => s + b.qty, 0)
@@ -282,6 +404,7 @@ export default function EditProductScreen() {
     setSaving(true);
     try {
       let finalImageId = imageId;
+      let finalThumb = thumb;
       if (pickedUri) {
         let base64: string;
         try {
@@ -303,6 +426,7 @@ export default function EditProductScreen() {
         }
         const oldImageId = imageId;
         finalImageId = newImageId;
+        finalThumb = await buildThumb(pickedUri);
         if (oldImageId && oldImageId !== newImageId) {
           await deleteImage(oldImageId).catch(() => {});
         }
@@ -317,6 +441,7 @@ export default function EditProductScreen() {
         discountPrice: discountNum,
         unit,
         imageId: finalImageId ?? null,
+        thumb: finalThumb ?? null,
         active,
         featured,
         perishable,
@@ -325,6 +450,7 @@ export default function EditProductScreen() {
         expiresAt: hasExpiry ? Timestamp.fromDate(expiryDate) : null,
         trackStock: effTrackStock,
         stock: effStock,
+        reorderLevel: reorderLevelNum,
         stockUpdatedAt: effTrackStock
           ? !id || stockChanged
             ? Timestamp.now()
@@ -497,8 +623,14 @@ export default function EditProductScreen() {
         <SwitchRow
           label={t('product.featured', 'Featured (show on buyer home)')}
           value={featured}
-          onValueChange={setFeatured}
+          onValueChange={onToggleFeatured}
         />
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('product.featuredCount', 'Featured: {count} of {max}', {
+            count: featuredOthers + (featured ? 1 : 0),
+            max: MAX_FEATURED_PRODUCTS,
+          })}
+        </ThemedText>
         <SwitchRow label={t('products.perishable', 'Perishable')} value={perishable} onValueChange={setPerishable} />
 
         <SwitchRow label={t('product.hasExpiry', 'Has expiry')} value={hasExpiry} onValueChange={setHasExpiry} />
@@ -542,6 +674,24 @@ export default function EditProductScreen() {
             )}
           </>
         )}
+
+        {trackStock || barcodes.length > 0 ? (
+          <>
+            <TextField
+              label={t('product.reorderLevel', 'Reorder level (low-stock alert)')}
+              placeholder={t('product.reorderLevelPlaceholder', 'e.g. 5 — blank for no alert')}
+              value={reorderLevel}
+              onChangeText={setReorderLevel}
+              keyboardType="numeric"
+            />
+            <ThemedText type="small" themeColor="textSecondary">
+              {t(
+                'product.reorderLevelHint',
+                'The dashboard flags this item once stock falls to this number or below.',
+              )}
+            </ThemedText>
+          </>
+        ) : null}
 
         {isDivisibleUnit(unit) ? (
           <>
@@ -628,10 +778,28 @@ export default function EditProductScreen() {
         )}
         <View style={styles.barcodeActions}>
           <Button title={t('product.scanBarcode', 'Scan barcode')} onPress={() => void openScanner()} />
+          <Button
+            title={t('product.generateBarcode', 'Generate barcode')}
+            variant="secondary"
+            onPress={generateInHouseBarcode}
+          />
           {barcodes.some((b) => b.qty === 0) ? (
             <Button title={t('product.removeZero', 'Remove 0-qty')} variant="secondary" onPress={removeZeroQty} />
           ) : null}
+          {barcodes.length > 0 ? (
+            <Button
+              title={t('product.printLabels', 'Print labels')}
+              variant="secondary"
+              onPress={() => void printLabels()}
+            />
+          ) : null}
         </View>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t(
+            'product.generateBarcodeHint',
+            'Generate mints an in-house EAN-13 (prefix 20) for loose or repacked goods that have no printed barcode. These codes are for in-store use only.',
+          )}
+        </ThemedText>
         {barcodes.length > 0 ? (
           <ThemedText type="smallBold">
             {t('product.barcodeTotal', 'Total stock: {count}', { count: barcodeTotal })}

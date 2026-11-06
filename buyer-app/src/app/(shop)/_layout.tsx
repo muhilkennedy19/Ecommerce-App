@@ -6,18 +6,24 @@ import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
 import { CartProvider } from '@/lib/cart';
 
-/** Route a tapped notification that carries a productId (broadcast / back-in-stock) to that
- *  product page, so the buyer can add it to the cart. Uses the response LISTENER (fires once
- *  per real tap) rather than useLastNotificationResponse (which returns a cached value that
- *  re-fires on every remount and would re-navigate / stack screens). */
+/** Route a tapped notification to the right place. A `productId` (broadcast / back-in-stock)
+ *  opens that product; an `orderId` from a delivery push (order-arriving / order-status) opens
+ *  that order's live track screen. Uses the response LISTENER (fires once per real tap) rather
+ *  than useLastNotificationResponse (which returns a cached value that re-fires on every remount
+ *  and would re-navigate / stack screens). */
 function useNotificationRouting() {
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       // Only the default tap, not a dismiss or custom action button.
       if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
-      const data = response.notification.request.content.data as { productId?: string } | undefined;
-      const productId = data?.productId;
-      if (productId) router.push(('/product/' + productId) as never);
+      const data = response.notification.request.content.data as
+        | { productId?: string; orderId?: string; event?: string }
+        | undefined;
+      if (data?.productId) {
+        router.push(('/product/' + data.productId) as never);
+      } else if (data?.orderId && (data.event === 'order-arriving' || data.event === 'order-status')) {
+        router.push(('/track/' + data.orderId) as never);
+      }
     });
     return () => sub.remove();
   }, []);

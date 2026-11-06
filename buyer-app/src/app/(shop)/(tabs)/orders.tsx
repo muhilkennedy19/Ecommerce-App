@@ -1,28 +1,39 @@
 import {
   buyerCancelOrder,
+  COURIER_UPDATE_INTERVAL_MS,
   fetchCustomerOrdersPage,
+  getOrder,
   ORDER_STATUS_LABELS,
+  orderDisplayCode,
+  orderMatchesCode,
   PAYMENT_MODE_LABELS,
   PAYMENT_STATUS_LABELS,
   type Order,
   type OrderStatus,
   type PaymentStatus,
 } from '@common';
-import { router, Tabs } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { router, Tabs, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, AppState, FlatList, StyleSheet, View } from 'react-native';
 
 import { useConfirm, useToast } from '@/components/feedback';
-import { Badge, Button, Card, DANGER, EmptyState, Loader, PRIMARY, Screen, SUCCESS } from '@/components/kit';
+import { Badge, Button, Card, DANGER, EmptyState, Loader, PRIMARY, Screen, SUCCESS, TextField } from '@/components/kit';
+import { DeliveryMap } from '@/components/delivery-map';
 import { OrderReview } from '@/components/order-review';
+import { OrderStatusAnimation } from '@/components/order-status-animation';
+import { OrderTimeline } from '@/components/order-timeline';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { useCart } from '@/lib/cart';
+import { shareInvoice } from '@/lib/invoice';
+import { logError } from '@/lib/logging';
 import { useT } from '@/lib/i18n';
 
 const money = (n: number) => `₹${n.toFixed(2)}`;
 const PAGE_SIZE = 10;
+/** Amber used for the "running late" badge (matches the accepted/claimed accents elsewhere). */
+const AMBER = '#F5A623';
 
 /** Opaque Firestore pagination cursor, inferred from the repo API (no direct firebase import). */
 type Cursor = Awaited<ReturnType<typeof fetchCustomerOrdersPage>>['cursor'];
@@ -30,6 +41,7 @@ type Cursor = Awaited<ReturnType<typeof fetchCustomerOrdersPage>>['cursor'];
 const STATUS_COLOR: Record<OrderStatus, string> = {
   new: PRIMARY,
   accepted: PRIMARY,
+  packed: PRIMARY,
   out_for_delivery: PRIMARY,
   served: SUCCESS,
   cancelled: DANGER,
@@ -40,6 +52,63 @@ const PAYMENT_STATUS_COLOR: Record<PaymentStatus, string> = {
   claimed: PRIMARY,
   verified: SUCCESS,
 };
+
+/**
+ * On-time / running-late pill for an in-progress order. The flag is set by the
+ * sales/delivery person in the admin app; absent/false reads as "On time". Shows nothing
+ * once the order is new, served, or cancelled, where lateness no longer applies.
+ */
+function ProgressBadge({ order }: Readonly<{ order: Order }>) {
+  const t = useT();
+  if (order.status !== 'accepted' && order.status !== 'packed' && order.status !== 'out_for_delivery') return null;
+  return (
+    <Badge
+      label={order.runningLate ? t('orders.runningLate', 'Running late') : t('orders.onTime', 'On time')}
+      color={order.runningLate ? AMBER : SUCCESS}
+    />
+  );
+}
+
+/**
+ * Live delivery map shown inline inside an order card's expanded section (replaces the status
+ * animation while "Track on map" is active). Reads straight off the order; the parent polls and
+ * refreshes the order, so the courier pin and badges move in place.
+ */
+function InlineTrack({ order }: Readonly<{ order: Order }>) {
+  const t = useT();
+  const courier =
+    order.courierLat != null && order.courierLng != null
+      ? { lat: order.courierLat, lng: order.courierLng }
+      : null;
+  const dest =
+    order.address?.lat != null && order.address?.lng != null
+      ? { lat: order.address.lat, lng: order.address.lng }
+      : null;
+
+  if (!courier) {
+    return (
+      <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
+        {t('track.waitingHint', 'Waiting for the delivery partner to start moving. This updates automatically.')}
+      </ThemedText>
+    );
+  }
+
+  return (
+    <View style={{ gap: Spacing.two }}>
+      <DeliveryMap courier={courier} dest={dest} height={300} />
+      <View style={{ flexDirection: 'row', gap: Spacing.four, justifyContent: 'center' }}>
+        <ThemedText type="small" themeColor="textSecondary">
+          🛵 {t('track.courier', 'Delivery partner')}
+        </ThemedText>
+        {dest ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            🏠 {t('track.you', 'You')}
+          </ThemedText>
+        ) : null}
+      </View>
+    </View>
+  );
+}
 
 export default function Orders() {
   const { user } = useAuth();
@@ -53,6 +122,68 @@ export default function Orders() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [firstLoaded, setFirstLoaded] = useState(false);
+  /** Order whose status timeline is currently expanded (only one at a time). */
+  const [expanded, setExpanded] = useState<string | null>(null);
+  /** Order whose expanded section is showing the live map (replaces the animation). */
+  const [mapId, setMapId] = useState<string | null>(null);
+  /** Free-text order-code search over the loaded pages. */
+  const [search, setSearch] = useState('');
+
+  const visibleOrders = useMemo(
+    () => orders.filter((o) => orderMatchesCode(o, search)),
+    [orders, search],
+  );
+
+  // While a card's live map is open, re-read just that order on the courier cadence so the pin
+  // and badges refresh in place — ONLY while this tab is focused and the app is foregrounded, so
+  // no reads are spent otherwise. Mirrors the courier write cadence.
+  useFocusEffect(
+    useCallback(() => {
+      if (!mapId) return;
+      let active = true;
+      let timer: ReturnType<typeof setInterval> | null = null;
+      const poll = async () => {
+        try {
+          const fresh = await getOrder(mapId);
+          if (active && fresh) setOrders((prev) => prev.map((x) => (x.id === mapId ? fresh : x)));
+        } catch {
+          // transient; next tick retries
+        }
+      };
+      const start = () => {
+        if (timer) return;
+        void poll();
+        timer = setInterval(() => void poll(), COURIER_UPDATE_INTERVAL_MS);
+      };
+      const stop = () => {
+        if (timer) clearInterval(timer);
+        timer = null;
+      };
+      start();
+      const sub = AppState.addEventListener('change', (s) => (s === 'active' ? start() : stop()));
+      return () => {
+        active = false;
+        stop();
+        sub.remove();
+      };
+    }, [mapId]),
+  );
+
+  const downloadBill = useCallback(
+    async (o: Order) => {
+      try {
+        await shareInvoice(o);
+      } catch (e) {
+        logError('orders.bill', e, { orderId: o.id });
+        toast({
+          type: 'error',
+          title: t('orders.billFailed', 'Could not create bill'),
+          message: t('common.tryAgain', 'Please try again.'),
+        });
+      }
+    },
+    [toast, t],
+  );
 
   const reorder = useCallback(
     (o: Order) => {
@@ -159,10 +290,14 @@ export default function Orders() {
     }
     return (
       <Card>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('orders.idLabel', 'Order ID')}: #{orderDisplayCode(o)}
+        </ThemedText>
         <View style={styles.header}>
           <ThemedText type="smallBold" style={{ flex: 1 }}>
             {money(o.grandTotal ?? o.total)}
           </ThemedText>
+          <ProgressBadge order={o} />
           <Badge label={ORDER_STATUS_LABELS[o.status]} color={STATUS_COLOR[o.status]} />
         </View>
         <View style={styles.header}>
@@ -191,6 +326,37 @@ export default function Orders() {
             size="sm"
             onPress={() => reorder(o)}
           />
+          <Button
+            title={expanded === o.id ? t('orders.hideTrack', 'Hide') : t('orders.track', 'Track')}
+            variant="secondary"
+            size="sm"
+            onPress={() => {
+              setMapId(null);
+              setExpanded((cur) => (cur === o.id ? null : o.id));
+            }}
+          />
+          {o.status === 'out_for_delivery' ? (
+            <Button
+              title={t('orders.trackMap', 'Track on map')}
+              variant={mapId === o.id ? 'primary' : 'secondary'}
+              size="sm"
+              onPress={() => {
+                if (mapId === o.id) {
+                  setMapId(null);
+                  setExpanded(null);
+                } else {
+                  setExpanded(o.id);
+                  setMapId(o.id);
+                }
+              }}
+            />
+          ) : null}
+          <Button
+            title={t('orders.downloadBill', 'Bill')}
+            variant="secondary"
+            size="sm"
+            onPress={() => void downloadBill(o)}
+          />
           {o.status === 'new' ? (
             <Button
               title={t('orders.cancel', 'Cancel')}
@@ -200,10 +366,20 @@ export default function Orders() {
             />
           ) : null}
         </View>
+        {expanded === o.id ? (
+          <View style={{ marginTop: Spacing.two, gap: Spacing.three }}>
+            <OrderTimeline order={o} showActor={false} />
+            {mapId === o.id ? (
+              <InlineTrack order={o} />
+            ) : (
+              <OrderStatusAnimation status={o.status} />
+            )}
+          </View>
+        ) : null}
         {o.status === 'served' ? <OrderReview order={o} user={user} /> : null}
       </Card>
     );
-  }, [t, reorder, cancel, user]);
+  }, [t, reorder, cancel, user, expanded, mapId, downloadBill]);
 
   return (
     <Screen scroll={false}>
@@ -213,10 +389,21 @@ export default function Orders() {
         <Loader label={t('orders.loading', 'Loading orders…')} />
       ) : (
         <FlatList
-          data={orders}
+          data={visibleOrders}
           keyExtractor={(o) => o.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={
+            orders.length > 0 ? (
+              <TextField
+                value={search}
+                onChangeText={setSearch}
+                placeholder={t('orders.searchPlaceholder', 'Search by Order ID')}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            ) : undefined
+          }
           refreshing={refreshing}
           onRefresh={onRefresh}
           onEndReachedThreshold={0.4}
@@ -224,8 +411,12 @@ export default function Orders() {
           ListEmptyComponent={
             loading ? undefined : (
               <EmptyState
-                title={t('orders.empty', 'No orders yet')}
-                hint={t('orders.emptyHint', 'Your placed orders will show up here.')}
+                title={search.trim() ? t('orders.noMatch', 'No matching orders') : t('orders.empty', 'No orders yet')}
+                hint={
+                  search.trim()
+                    ? t('orders.noMatchHint', 'No order on a loaded page matches that ID. Pull to refresh or load more.')
+                    : t('orders.emptyHint', 'Your placed orders will show up here.')
+                }
               />
             )
           }

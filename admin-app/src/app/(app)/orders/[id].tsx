@@ -4,10 +4,12 @@ import {
   formatQty,
   fuzzyFilter,
   ORDER_STATUS_LABELS,
+  orderDisplayCode,
   PAYMENT_MODE_LABELS,
   PAYMENT_STATUS_LABELS,
   roundMoney,
-  subscribeOrders,
+  setOrderRunningLate,
+  subscribeOrder,
   subscribeProducts,
   userHasPermission,
   type Order,
@@ -29,13 +31,17 @@ import {
   Screen,
   SectionTitle,
   SUCCESS,
+  SwitchRow,
   TextField,
 } from '@/components/kit';
 import { useToast } from '@/components/feedback';
+import { OrderTimeline } from '@/components/order-timeline';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth';
 import { shopId } from '@/lib/config';
+import { shareInvoice } from '@/lib/invoice';
+import { logError } from '@/lib/logging';
 import { useT, type TFn } from '@/lib/i18n';
 
 import { ContactBlock, PaymentBlock, STATUS_COLOR } from './index';
@@ -82,13 +88,17 @@ export default function OrderDetailScreen() {
   const [saving, setSaving] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [addQuery, setAddQuery] = useState('');
+  const [printing, setPrinting] = useState(false);
 
+  // A single-doc listener, not a slice of the paginated list: opening an order from deep in
+  // the history must work regardless of how many pages have been loaded.
   useEffect(() => {
-    return subscribeOrders(shopId, (o) => {
-      setOrders(o);
+    if (!id) return;
+    return subscribeOrder(id, (o) => {
+      setOrders(o ? [o] : []);
       setLoaded(true);
     });
-  }, []);
+  }, [id]);
 
   useEffect(() => {
     if (!canServe) return;
@@ -186,6 +196,10 @@ export default function OrderDetailScreen() {
           <ThemedText type="smallBold">{order.customerName ?? t('common.customer', 'Customer')}</ThemedText>
           <Badge label={ORDER_STATUS_LABELS[order.status]} color={STATUS_COLOR[order.status]} />
         </View>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('orders.idLabel', 'Order ID')}: #{orderDisplayCode(order)}
+          {order.channel === 'pos' ? ' · POS' : ''}
+        </ThemedText>
         <ContactBlock order={order} />
       </Card>
 
@@ -193,20 +207,52 @@ export default function OrderDetailScreen() {
         <PaymentBlock order={order} />
       </Card>
 
+      {canServe && (order.status === 'accepted' || order.status === 'packed' || order.status === 'out_for_delivery') ? (
+        <Card style={{ gap: Spacing.one }}>
+          <SwitchRow
+            label={t('order.runningLate', 'Running late')}
+            value={!!order.runningLate}
+            onValueChange={(v) => {
+              setOrderRunningLate(order.id, v).catch((e: unknown) => {
+                logError('order.runningLate', e, { orderId: order.id });
+                toast({ type: 'error', title: t('common.updateFailed', 'Update failed'), message: errMsg(e) });
+              });
+            }}
+          />
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('order.runningLateHint', 'Turn on if this order is delayed — the customer sees a “Running late” badge.')}
+          </ThemedText>
+        </Card>
+      ) : null}
+
       {statusLog.length > 0 ? (
         <>
           <SectionTitle>{t('orders.trail', 'Status trail')}</SectionTitle>
-          <Card style={{ gap: Spacing.two }}>
-            {statusLog.map((entry, idx) => (
-              <ThemedText key={idx} type="small">
-                {`${ORDER_STATUS_LABELS[entry.status]} · ${entry.byName ?? 'Someone'} · ${new Date(
-                  entry.at,
-                ).toLocaleString()}`}
-              </ThemedText>
-            ))}
+          <Card>
+            <OrderTimeline order={order} />
           </Card>
         </>
       ) : null}
+
+      <Button
+        title={t('order.downloadInvoice', 'Download invoice')}
+        variant="secondary"
+        loading={printing}
+        onPress={() => {
+          setPrinting(true);
+          // Admin copy claims the next sequential bill number; see lib/invoice.
+          shareInvoice(order, { claimNumber: true })
+            .catch((e: unknown) => {
+              logError('order.invoice', e, { orderId: order.id });
+              toast({
+                type: 'error',
+                title: t('order.invoiceFailed', 'Could not create invoice'),
+                message: errMsg(e),
+              });
+            })
+            .finally(() => setPrinting(false));
+        }}
+      />
 
       <SectionTitle>{t('order.items', 'Items')}</SectionTitle>
       <Card style={{ gap: Spacing.three }}>
